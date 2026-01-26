@@ -1,0 +1,67 @@
+name: zztherapy
+description: "Eazy Talks - Flutter mobile app"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI & Icons
+  cupertino_icons: ^1.0.8
+  
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+  
+  # Navigation
+  go_router: ^13.0.0
+  
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  google_sign_in: ^6.2.1
+  
+  # HTTP Client
+  http: ^1.2.0
+  dio: ^5.4.0
+  
+  # WebSocket / Real-time
+  socket_io_client: ^2.0.3+1
+  
+  # Local Storage
+  shared_preferences: ^2.2.2
+  
+  # Animations
+  flutter_animate: ^4.5.0
+  
+  # Skeletons
+  skeletonizer: ^2.1.2
+  
+  # Utils
+  intl: ^0.19.0
+  equatable: ^2.0.5
+  package_info_plus: ^8.0.0
+  agora_rtc_engine: ^6.5.3
+  permission_handler: ^12.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  riverpod_generator: ^2.3.9
+  build_runner: ^2.4.7
+
+dependency_overrides:
+  shared_preferences_android: 2.4.18
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - lib/assets/male/
+    - lib/assets/female/

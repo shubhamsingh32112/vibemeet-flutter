@@ -1,0 +1,418 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/utils/error_handler.dart';
+import '../../../shared/widgets/loading_indicator.dart';
+import '../providers/auth_provider.dart';
+
+class LoginScreen extends ConsumerStatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends ConsumerState<LoginScreen> {
+  final _phoneController = TextEditingController();
+  bool _acceptTerms = false;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🖱️  [UI] Google sign in button pressed');
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('   ⏰ Timestamp: ${DateTime.now().toIso8601String()}');
+    debugPrint('   📱 Screen: Login Screen');
+    debugPrint('   🔘 Action: Google Sign In');
+
+    final startTime = DateTime.now();
+    await ref.read(authProvider.notifier).signInWithGoogle();
+    final duration = DateTime.now().difference(startTime);
+
+    debugPrint('───────────────────────────────────────────────────────');
+    debugPrint('📊 [UI] Google sign in initiated');
+    debugPrint('───────────────────────────────────────────────────────');
+    debugPrint('   ⏱️  Sign-in call duration: ${duration.inMilliseconds}ms');
+    debugPrint('   💡 Auth state listener will handle navigation');
+    debugPrint('   💡 Backend sync is in progress...');
+    
+    // The auth state listener in initState will handle navigation
+    // when authentication completes. We don't need to check here
+    // because the backend sync happens asynchronously via the auth
+    // state listener in auth_provider.dart
+  }
+
+  Future<void> _handlePhoneLogin() async {
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🖱️  [UI] Phone login button pressed');
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('   ⏰ Timestamp: ${DateTime.now().toIso8601String()}');
+    debugPrint('   📱 Screen: Login Screen');
+    debugPrint('   🔘 Action: Phone Sign In');
+    
+    if (_phoneController.text.isEmpty) {
+      debugPrint('───────────────────────────────────────────────────────');
+      debugPrint('⚠️  [UI] Validation failed');
+      debugPrint('───────────────────────────────────────────────────────');
+      debugPrint('   ❌ Phone number field is empty');
+      debugPrint('   💡 User must enter a phone number');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your phone number')),
+      );
+      return;
+    }
+    
+    if (!_acceptTerms) {
+      debugPrint('───────────────────────────────────────────────────────');
+      debugPrint('⚠️  [UI] Validation failed');
+      debugPrint('───────────────────────────────────────────────────────');
+      debugPrint('   ❌ Terms and conditions not accepted');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please accept the terms and conditions')),
+      );
+      return;
+    }
+
+    final phoneNumber = _phoneController.text.trim();
+    debugPrint('───────────────────────────────────────────────────────');
+    debugPrint('📱 [UI] Phone number entered');
+    debugPrint('───────────────────────────────────────────────────────');
+    debugPrint('   📞 Phone: $phoneNumber');
+    debugPrint('   📏 Length: ${phoneNumber.length} characters');
+    debugPrint('   🔄 Calling signInWithPhone()...');
+
+    final startTime = DateTime.now();
+    await ref.read(authProvider.notifier).signInWithPhone(phoneNumber);
+    final duration = DateTime.now().difference(startTime);
+
+    debugPrint('───────────────────────────────────────────────────────');
+    debugPrint('📊 [UI] Phone sign in initiated');
+    debugPrint('───────────────────────────────────────────────────────');
+    debugPrint('   ⏱️  Duration: ${duration.inMilliseconds}ms');
+    debugPrint('   💡 Auth state listener will handle navigation when verification ID is received');
+    
+    // The auth state listener in build() will handle navigation
+    // when verificationId is set in the state
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    
+    // Listen for authentication state changes to navigate automatically
+    // ref.listen MUST be called directly in build() method
+    ref.listen(authProvider, (previous, next) {
+      // Navigate to OTP screen when verification ID is received
+      if (next.verificationId != null && 
+          previous?.verificationId != next.verificationId && 
+          next.phoneNumber != null &&
+          mounted) {
+        debugPrint('───────────────────────────────────────────────────────');
+        debugPrint('✅ [UI] Auth state listener: Verification ID received');
+        debugPrint('───────────────────────────────────────────────────────');
+        debugPrint('   🆔 Verification ID: ${next.verificationId}');
+        debugPrint('   📱 Phone: ${next.phoneNumber}');
+        debugPrint('   🧭 Navigating to OTP screen...');
+        context.push(
+          '/otp?phone=${Uri.encodeComponent(next.phoneNumber!)}&verificationId=${Uri.encodeComponent(next.verificationId!)}',
+        );
+        debugPrint('   ✅ Navigation completed');
+      }
+      // Navigate to home or gender selection when authenticated
+      else if (next.isAuthenticated && mounted && previous?.isAuthenticated != true) {
+        debugPrint('───────────────────────────────────────────────────────');
+        debugPrint('✅ [UI] Auth state listener: User authenticated');
+        debugPrint('───────────────────────────────────────────────────────');
+        debugPrint('   🆔 User ID: ${next.user?.id}');
+        debugPrint('   📧 Email: ${next.user?.email ?? "N/A"}');
+        debugPrint('   👤 Gender: ${next.user?.gender ?? "Not set"}');
+        
+        // Check if user has completed onboarding (has gender)
+        if (next.user?.gender == null || next.user!.gender!.isEmpty) {
+          debugPrint('   🎯 Navigating to gender selection screen...');
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              context.go('/gender');
+            }
+          });
+        } else {
+          debugPrint('   🏠 Navigating to home screen...');
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              context.go('/home');
+            }
+          });
+        }
+      } 
+      // Show error messages
+      else if (next.error != null && mounted && !next.isLoading && previous?.error != next.error) {
+        debugPrint('───────────────────────────────────────────────────────');
+        debugPrint('❌ [UI] Auth state listener: Authentication error');
+        debugPrint('───────────────────────────────────────────────────────');
+        debugPrint('   Error: ${next.error}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(ErrorHandler.getHumanReadableError(next.error!)),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    });
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF2D1B3D), // Match gradient color to prevent white space
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              const Color(0xFF2D1B3D), // Dark purple-brown
+              const Color(0xFF3D2B4D), // Slightly lighter purple-brown
+              const Color(0xFF2D1B3D), // Back to dark
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 40),
+                  
+                  // Title
+                  Text(
+                    'Login to get started',
+                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          fontSize: 32,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                  
+                  const SizedBox(height: 40),
+                  
+                  // Mobile Number Input Field
+                  TextField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      hintText: 'Mobile Number',
+                      hintStyle: TextStyle(color: Colors.grey[400]),
+                      filled: true,
+                      fillColor: Colors.white.withOpacity(0.1),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Colors.white,
+                          width: 2,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Instructional Text
+                  Text(
+                    'You will receive an OTP on this number.',
+                    style: TextStyle(
+                      color: Colors.grey[300],
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Terms & Conditions Checkbox
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Checkbox(
+                        value: _acceptTerms,
+                        onChanged: (value) {
+                          setState(() {
+                            _acceptTerms = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.white,
+                        checkColor: const Color(0xFF2D1B3D),
+                        side: BorderSide(
+                          color: Colors.white.withOpacity(0.7),
+                          width: 2,
+                        ),
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: RichText(
+                            text: TextSpan(
+                              style: TextStyle(
+                                color: Colors.grey[300],
+                                fontSize: 12,
+                                height: 1.5,
+                              ),
+                              children: [
+                                const TextSpan(text: 'I accept '),
+                                TextSpan(
+                                  text: 'terms & conditions',
+                                  style: TextStyle(
+                                    decoration: TextDecoration.underline,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const TextSpan(text: ' and '),
+                                TextSpan(
+                                  text: 'community guidelines',
+                                  style: TextStyle(
+                                    decoration: TextDecoration.underline,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const TextSpan(text: ' of Eaze. I also agree to receiving updates on WhatsApp/SMS.'),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 32),
+                  
+                  // Get OTP Button
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: authState.isLoading || !_acceptTerms
+                          ? null
+                          : _handlePhoneLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: const Color(0xFF2D1B3D),
+                        disabledBackgroundColor: Colors.grey[600],
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: authState.isLoading
+                          ? const LoadingIndicator()
+                          : const Text(
+                              'Get OTP',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Divider with "OR"
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Divider(
+                          color: Colors.white.withOpacity(0.3),
+                          thickness: 1,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'OR',
+                          style: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Divider(
+                          color: Colors.white.withOpacity(0.3),
+                          thickness: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 24),
+                  
+                  // Google Sign In Button
+                  SizedBox(
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: authState.isLoading ? null : _handleGoogleSignIn,
+                      icon: authState.isLoading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: LoadingIndicator(size: 20),
+                            )
+                          : const Icon(
+                              Icons.g_mobiledata,
+                              size: 28,
+                              color: Colors.white,
+                            ),
+                      label: const Text(
+                        'Continue with Google',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: Colors.white.withOpacity(0.5),
+                          width: 1.5,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+}

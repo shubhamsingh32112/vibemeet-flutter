@@ -1,0 +1,104 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../features/auth/screens/splash_screen.dart';
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/otp_screen.dart';
+import '../../features/onboarding/screens/gender_selection_screen.dart';
+import '../../features/home/screens/home_screen.dart';
+import '../../features/recent/screens/recent_screen.dart';
+import '../../features/chat/screens/chat_screen.dart';
+import '../../features/account/screens/account_screen.dart';
+import '../../features/account/screens/edit_profile_screen.dart';
+import '../../features/call/screens/video_call_screen.dart';
+import '../../features/call/screens/incoming_call_screen.dart';
+
+final appRouter = GoRouter(
+  initialLocation: '/splash',
+  routes: [
+    GoRoute(
+      path: '/splash',
+      builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: '/login',
+      builder: (context, state) => const LoginScreen(),
+    ),
+          GoRoute(
+            path: '/otp',
+            builder: (context, state) {
+              final phoneNumber = state.uri.queryParameters['phone'];
+              final verificationId = state.uri.queryParameters['verificationId'];
+              
+              if (phoneNumber == null || verificationId == null) {
+                // Redirect to login if parameters are missing
+                return const LoginScreen();
+              }
+              
+              return OtpScreen(
+                phoneNumber: phoneNumber,
+                verificationId: verificationId,
+              );
+            },
+          ),
+          GoRoute(
+            path: '/gender',
+            builder: (context, state) => const GenderSelectionScreen(),
+          ),
+          GoRoute(
+            path: '/home',
+            builder: (context, state) => const HomeScreen(),
+          ),
+    GoRoute(
+      path: '/recent',
+      builder: (context, state) => const RecentScreen(),
+    ),
+    GoRoute(
+      path: '/chat',
+      builder: (context, state) => const ChatScreen(),
+    ),
+          GoRoute(
+            path: '/account',
+            builder: (context, state) => const AccountScreen(),
+          ),
+          GoRoute(
+            path: '/edit-profile',
+            builder: (context, state) => const EditProfileScreen(),
+          ),
+    GoRoute(
+      path: '/video-call',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        if (extra == null) {
+          return const Scaffold(
+            body: Center(child: Text('Missing call parameters')),
+          );
+        }
+        return VideoCallScreen(
+          callId: extra['callId'] as String,
+          channelName: extra['channelName'] as String,
+          token: extra['token'] as String?,
+          uid: extra['uid'] as int?,
+        );
+      },
+    ),
+    GoRoute(
+      path: '/incoming-call',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        if (extra == null || extra['call'] == null) {
+          return const Scaffold(
+            body: Center(child: Text('Missing call data')),
+          );
+        }
+        return IncomingCallScreen(
+          call: extra['call'] as dynamic,
+        );
+      },
+    ),
+  ],
+  errorBuilder: (context, state) => Scaffold(
+    body: Center(
+      child: Text('Error: ${state.error}'),
+    ),
+  ),
+);
