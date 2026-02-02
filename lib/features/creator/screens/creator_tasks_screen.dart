@@ -1,0 +1,721 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../auth/providers/auth_provider.dart';
+import '../providers/creator_task_provider.dart';
+import '../models/creator_task_model.dart';
+import '../../../shared/widgets/ui_primitives.dart';
+import '../../../shared/styles/app_brand_styles.dart';
+import '../../../shared/widgets/loading_indicator.dart';
+
+class CreatorTasksScreen extends ConsumerStatefulWidget {
+  const CreatorTasksScreen({super.key});
+
+  @override
+  ConsumerState<CreatorTasksScreen> createState() => _CreatorTasksScreenState();
+}
+
+class _CreatorTasksScreenState extends ConsumerState<CreatorTasksScreen> {
+  // Track claiming state for optimistic UX
+  final Set<String> _claimingTaskKeys = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+    final user = authState.user;
+    
+    // 🔒 PHASE T2: Role guard at route level
+    if (user?.role != 'creator' && user?.role != 'admin') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pop();
+      });
+      return const Scaffold(body: Center(child: Text('Unauthorized')));
+    }
+    
+    final coins = user?.coins ?? 0;
+    final tasksAsync = ref.watch(creatorTasksProvider);
+
+    return AppScaffold(
+      padded: false,
+      child: Column(
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: Icon(
+                    Icons.arrow_back_ios_new,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    'Tasks & Rewards',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                _CoinsPill(coins: coins),
+              ],
+            ),
+          ),
+
+          // Content
+          Expanded(
+            child: tasksAsync.when(
+              data: (tasksResponse) {
+                // 🔒 PHASE T2: Empty state - "No completed calls yet" (not "No tasks")
+                if (tasksResponse.totalMinutes == 0) {
+                  return _EmptyState();
+                }
+                return _TasksContent(
+                  tasksResponse: tasksResponse,
+                  claimingTaskKeys: _claimingTaskKeys,
+                  onClaim: (taskKey) => _claimTask(taskKey),
+                );
+              },
+              loading: () => const Center(child: LoadingIndicator()),
+              error: (error, stack) => _ErrorView(
+                error: error.toString(),
+                onRetry: () => ref.refresh(creatorTasksProvider),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔒 PHASE T2: Optimistic claim UX (without coin mutation)
+  Future<void> _claimTask(String taskKey) async {
+    // Optimistically disable button and show spinner
+    setState(() {
+      _claimingTaskKeys.add(taskKey);
+    });
+
+    try {
+      await ref.read(creatorTaskServiceProvider).claimTaskReward(taskKey);
+      
+      // Invalidate provider to refresh task state (mark as claimed)
+      ref.invalidate(creatorTasksProvider);
+      
+      // Remove from claiming set
+      if (mounted) {
+        setState(() {
+          _claimingTaskKeys.remove(taskKey);
+        });
+      }
+      
+      // DO NOT modify coins locally - wait for coins_updated socket event
+      // This matches wallet & call billing behavior
+      
+      if (mounted) {
+        final scheme = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Reward claimed successfully!'),
+            backgroundColor: scheme.primaryContainer,
+          ),
+        );
+      }
+    } catch (e) {
+      // Remove from claiming set on error
+      if (mounted) {
+        setState(() {
+          _claimingTaskKeys.remove(taskKey);
+        });
+        
+        final scheme = Theme.of(context).colorScheme;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to claim reward: ${e.toString()}'),
+            backgroundColor: scheme.errorContainer,
+          ),
+        );
+      }
+    }
+  }
+}
+
+class _TasksContent extends StatelessWidget {
+  final CreatorTasksResponse tasksResponse;
+  final Set<String> claimingTaskKeys;
+  final Function(String) onClaim;
+
+  const _TasksContent({
+    required this.tasksResponse,
+    required this.claimingTaskKeys,
+    required this.onClaim,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final totalMinutes = tasksResponse.totalMinutes;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Top Card: Total Minutes Completed
+          AppCard(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Total Minutes Completed',
+                  style: TextStyle(
+                    color: scheme.onSurface.withOpacity(0.7),
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: AppBrandGradients.walletCoinGold,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${totalMinutes.toStringAsFixed(1)} mins',
+                        style: const TextStyle(
+                          color: AppBrandGradients.walletOnGold,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // 🔒 PHASE T4: Withdraw button stub (disabled, shows "Coming soon")
+                    OutlinedButton(
+                      onPressed: null, // Disabled - withdrawals need separate threat model
+                      child: const Text('Withdraw (Coming Soon)'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                // B) Next task preview - "Next reward in X minutes"
+                _NextTaskPreview(
+                  totalMinutes: totalMinutes,
+                  tasks: tasksResponse.tasks,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Earnings are calculated from completed calls. View your wallet for total coins earned.',
+                  style: TextStyle(
+                    color: scheme.onSurface.withOpacity(0.6),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Progress Slider
+          AppCard(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Progress',
+                  style: TextStyle(
+                    color: scheme.onSurface,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Progress bar
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: (totalMinutes / 600).clamp(0.0, 1.0), // Max 600 mins (4 hours)
+                    minHeight: 12,
+                    backgroundColor: scheme.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      scheme.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Milestones
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _MilestoneMarker(
+                      label: '1hr',
+                      minutes: 60,
+                      currentMinutes: totalMinutes,
+                    ),
+                    _MilestoneMarker(
+                      label: '2hrs',
+                      minutes: 120,
+                      currentMinutes: totalMinutes,
+                    ),
+                    _MilestoneMarker(
+                      label: '3hrs',
+                      minutes: 180,
+                      currentMinutes: totalMinutes,
+                    ),
+                    _MilestoneMarker(
+                      label: '4hrs',
+                      minutes: 240,
+                      currentMinutes: totalMinutes,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          // Task List
+          Text(
+            'Tasks',
+            style: TextStyle(
+              color: scheme.onSurface,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...tasksResponse.tasks.map((task) => _TaskCard(
+                task: task,
+                isClaiming: claimingTaskKeys.contains(task.taskKey),
+                onClaim: () => onClaim(task.taskKey),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _MilestoneMarker extends StatelessWidget {
+  final String label;
+  final int minutes;
+  final double currentMinutes;
+
+  const _MilestoneMarker({
+    required this.label,
+    required this.minutes,
+    required this.currentMinutes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isReached = currentMinutes >= minutes;
+
+    return Column(
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isReached ? scheme.primary : scheme.surfaceContainerHighest,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: isReached
+                ? scheme.primary
+                : scheme.onSurface.withOpacity(0.5),
+            fontSize: 12,
+            fontWeight: isReached ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TaskCard extends StatefulWidget {
+  final CreatorTask task;
+  final bool isClaiming;
+  final VoidCallback onClaim;
+
+  const _TaskCard({
+    required this.task,
+    required this.isClaiming,
+    required this.onClaim,
+  });
+
+  @override
+  State<_TaskCard> createState() => _TaskCardState();
+}
+
+class _TaskCardState extends State<_TaskCard> with SingleTickerProviderStateMixin {
+  late AnimationController _animationController;
+  bool _wasCompleted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _wasCompleted = widget.task.isCompleted;
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    
+    // 🔒 PHASE T4: Visual "completion moment" - animate when task becomes completed
+    if (widget.task.isCompleted && !widget.task.isClaimed) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _animationController.forward();
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(_TaskCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Animate when task transitions from incomplete to completed
+    if (!_wasCompleted && widget.task.isCompleted && !widget.task.isClaimed) {
+      _animationController.forward();
+      _wasCompleted = true;
+    }
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final task = widget.task;
+    final isClaiming = widget.isClaiming;
+
+    return AppCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Task header
+          Row(
+            children: [
+              // Checkbox/checkmark with animation
+              AnimatedBuilder(
+                animation: _animationController,
+                builder: (context, child) {
+                  return Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: task.isCompleted
+                          ? scheme.primary
+                          : scheme.surfaceContainerHighest,
+                      boxShadow: task.isCompleted && !task.isClaimed
+                          ? [
+                              BoxShadow(
+                                color: scheme.primary.withOpacity(
+                                  0.5 * _animationController.value,
+                                ),
+                                blurRadius: 8 * _animationController.value,
+                                spreadRadius: 2 * _animationController.value,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: task.isCompleted
+                        ? Icon(
+                            Icons.check,
+                            size: 16,
+                            color: scheme.onPrimary,
+                          )
+                        : null,
+                  );
+                },
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Complete ${task.thresholdMinutes} minutes',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${task.progressMinutes.toStringAsFixed(1)} / ${task.thresholdMinutes} minutes',
+                      style: TextStyle(
+                        color: scheme.onSurface.withOpacity(0.7),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Reward label
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  gradient: AppBrandGradients.walletCoinGold,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '+${task.rewardCoins} coins',
+                  style: const TextStyle(
+                    color: AppBrandGradients.walletOnGold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: task.progressPercentage,
+              minHeight: 6,
+              backgroundColor: scheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                task.isCompleted ? scheme.primary : scheme.primary.withOpacity(0.5),
+              ),
+            ),
+          ),
+
+          // Claim button
+          if (task.canClaim) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isClaiming ? null : widget.onClaim,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  disabledBackgroundColor: scheme.surfaceContainerHighest,
+                ),
+                child: isClaiming
+                    ? SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(scheme.onPrimary),
+                        ),
+                      )
+                    : const Text('Claim Reward'),
+              ),
+            ),
+          ],
+
+          // Claimed indicator
+          if (task.isClaimed) ...[
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  size: 16,
+                  color: scheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Reward claimed',
+                  style: TextStyle(
+                    color: scheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// 🔒 PHASE T2: Empty state - "No completed calls yet" (NOT "No tasks")
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const EmptyState(
+      icon: Icons.phone_disabled_outlined,
+      title: 'No completed calls yet',
+      message: 'Complete video calls to start earning bonus coins! Your progress will appear here once you finish your first call.',
+    );
+  }
+}
+
+// 🔒 PHASE T2: Error state (explicit)
+class _ErrorView extends StatelessWidget {
+  final String error;
+  final VoidCallback onRetry;
+
+  const _ErrorView({
+    required this.error,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ErrorState(
+      title: 'Failed to load tasks',
+      message: error,
+      actionLabel: 'Retry',
+      onAction: onRetry,
+    );
+  }
+}
+
+// B) Next task preview - Pure UX sugar
+class _NextTaskPreview extends StatelessWidget {
+  final double totalMinutes;
+  final List<CreatorTask> tasks;
+
+  const _NextTaskPreview({
+    required this.totalMinutes,
+    required this.tasks,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    
+    // Find next uncompleted task
+    try {
+      final nextTask = tasks.firstWhere((task) => !task.isCompleted);
+      final minutesNeeded = nextTask.thresholdMinutes - totalMinutes;
+      
+      if (minutesNeeded <= 0) {
+        return const SizedBox.shrink();
+      }
+
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: scheme.outlineVariant,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.trending_up,
+              size: 16,
+              color: scheme.primary,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Next reward in ${minutesNeeded.toStringAsFixed(0)} minutes (+${nextTask.rewardCoins} coins)',
+                style: TextStyle(
+                  color: scheme.onSurface,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      // All tasks completed
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.celebration,
+              size: 16,
+              color: scheme.onPrimaryContainer,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'All tasks completed! 🎉',
+                style: TextStyle(
+                  color: scheme.onPrimaryContainer,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+}
+
+class _CoinsPill extends StatelessWidget {
+  final int coins;
+
+  const _CoinsPill({required this.coins});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: AppBrandGradients.walletCoinGold,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.monetization_on,
+            size: 16,
+            color: AppBrandGradients.walletOnGold,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            '$coins',
+            style: const TextStyle(
+              color: AppBrandGradients.walletOnGold,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

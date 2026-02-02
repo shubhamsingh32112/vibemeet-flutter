@@ -5,6 +5,7 @@ import '../../core/constants/app_constants.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/call/widgets/incoming_call_listener.dart';
 import '../../features/creator/providers/creator_status_provider.dart';
+import '../../shared/styles/app_brand_styles.dart';
 import '../../shared/widgets/loading_indicator.dart';
 
 class MainLayout extends ConsumerStatefulWidget {
@@ -31,9 +32,6 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         context.go('/recent');
         break;
       case 2:
-        context.go('/chat');
-        break;
-      case 3:
         context.go('/account');
         break;
     }
@@ -51,6 +49,7 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
 
     return IncomingCallListener(
       child: Scaffold(
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(
             AppConstants.appName,
@@ -139,7 +138,12 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             ),
           ],
         ),
-        body: widget.child,
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: AppBrandGradients.appBackground,
+          ),
+          child: widget.child,
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: widget.selectedIndex,
           onDestinationSelected: _onItemTapped,
@@ -153,11 +157,6 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               icon: Icon(Icons.history_outlined),
               selectedIcon: Icon(Icons.history),
               label: 'Recent',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.chat_bubble_outline),
-              selectedIcon: Icon(Icons.chat_bubble),
-              label: 'Chat',
             ),
             NavigationDestination(
               icon: Icon(Icons.person_outline),

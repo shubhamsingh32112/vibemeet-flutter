@@ -118,6 +118,19 @@ class ApiClient {
     }
   }
 
+  Future<Response> patch(String path, {dynamic data}) async {
+    try {
+      debugPrint('🟣 [API] PATCH request to: $path');
+      if (data != null) {
+        debugPrint('   📦 PATCH data: $data');
+      }
+      return await _dio.patch(path, data: data);
+    } catch (e) {
+      debugPrint('❌ [API] PATCH request failed: $e');
+      rethrow;
+    }
+  }
+
   Future<Response> delete(String path) async {
     try {
       debugPrint('🔴 [API] DELETE request to: $path');

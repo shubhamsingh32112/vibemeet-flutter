@@ -11,6 +11,9 @@ class SocketService {
 
   IO.Socket? _socket;
   bool _isConnected = false;
+  
+  // Phase R5: Internal listener registry to prevent clobbering
+  final Map<String, List<Function(Map<String, dynamic>)>> _listeners = {};
 
   /// Get socket instance (creates if not exists)
   IO.Socket? get socket => _socket;
@@ -109,6 +112,7 @@ class SocketService {
   /// Listen to incoming call event (for creators)
   /// ⚠️ IMPORTANT: Register this listener IMMEDIATELY after socket connects
   /// If registered after replay events are emitted, you'll miss them
+  /// Phase R5: Uses internal registry - multiple listeners supported
   void onIncomingCall(Function(Map<String, dynamic>) callback) {
     if (_socket == null) {
       debugPrint('⚠️  [SOCKET] Socket not initialized, cannot listen to incoming_call');
@@ -116,65 +120,175 @@ class SocketService {
       return;
     }
 
-    _socket!.on('incoming_call', (data) {
-      debugPrint('📞 [SOCKET] Incoming call received');
-      debugPrint('   Data: $data');
-      callback(data as Map<String, dynamic>);
-    });
-    debugPrint('✅ [SOCKET] Listener registered for incoming_call');
+    // Phase R5: Add to registry instead of replacing
+    _listeners.putIfAbsent('incoming_call', () => []).add(callback);
+    
+    // Only register socket listener once per event
+    if (_listeners['incoming_call']!.length == 1) {
+      _socket!.on('incoming_call', (data) {
+        debugPrint('📞 [SOCKET] Incoming call received');
+        debugPrint('   Data: $data');
+        final callbacks = _listeners['incoming_call'] ?? [];
+        for (final cb in callbacks) {
+          cb(data as Map<String, dynamic>);
+        }
+      });
+    }
+    debugPrint('✅ [SOCKET] Listener registered for incoming_call (total: ${_listeners['incoming_call']?.length ?? 0})');
   }
 
   /// Listen to call accepted event (for callers)
+  /// Phase R5: Uses internal registry - multiple listeners supported
   void onCallAccepted(Function(Map<String, dynamic>) callback) {
     if (_socket == null) {
       debugPrint('⚠️  [SOCKET] Socket not initialized, cannot listen to call_accepted');
       return;
     }
 
-    _socket!.on('call_accepted', (data) {
-      debugPrint('✅ [SOCKET] Call accepted received');
-      debugPrint('   Data: $data');
-      callback(data as Map<String, dynamic>);
-    });
+    // Phase R5: Add to registry instead of replacing
+    _listeners.putIfAbsent('call_accepted', () => []).add(callback);
+    
+    // Only register socket listener once per event
+    if (_listeners['call_accepted']!.length == 1) {
+      _socket!.on('call_accepted', (data) {
+        debugPrint('✅ [SOCKET] Call accepted received');
+        debugPrint('   Data: $data');
+        final callbacks = _listeners['call_accepted'] ?? [];
+        for (final cb in callbacks) {
+          cb(data as Map<String, dynamic>);
+        }
+      });
+    }
+    debugPrint('✅ [SOCKET] Listener registered for call_accepted (total: ${_listeners['call_accepted']?.length ?? 0})');
   }
 
   /// Listen to call rejected event (for callers)
+  /// Phase R5: Uses internal registry - multiple listeners supported
   void onCallRejected(Function(Map<String, dynamic>) callback) {
     if (_socket == null) {
       debugPrint('⚠️  [SOCKET] Socket not initialized, cannot listen to call_rejected');
       return;
     }
 
-    _socket!.on('call_rejected', (data) {
-      debugPrint('❌ [SOCKET] Call rejected received');
-      debugPrint('   Data: $data');
-      callback(data as Map<String, dynamic>);
-    });
+    // Phase R5: Add to registry instead of replacing (no off() call)
+    _listeners.putIfAbsent('call_rejected', () => []).add(callback);
+    
+    // Only register socket listener once per event
+    if (_listeners['call_rejected']!.length == 1) {
+      _socket!.on('call_rejected', (data) {
+        debugPrint('❌ [SOCKET] Call rejected received');
+        debugPrint('   Data: $data');
+        final callbacks = _listeners['call_rejected'] ?? [];
+        for (final cb in callbacks) {
+          cb(data as Map<String, dynamic>);
+        }
+      });
+    }
+    debugPrint('✅ [SOCKET] Listener registered for call_rejected (total: ${_listeners['call_rejected']?.length ?? 0})');
   }
 
   /// Listen to call ended event (for both parties)
+  /// Phase R5: Uses internal registry - multiple listeners supported
   void onCallEnded(Function(Map<String, dynamic>) callback) {
     if (_socket == null) {
       debugPrint('⚠️  [SOCKET] Socket not initialized, cannot listen to call_ended');
       return;
     }
 
-    _socket!.on('call_ended', (data) {
-      debugPrint('🔚 [SOCKET] Call ended received');
-      debugPrint('   Data: $data');
-      callback(data as Map<String, dynamic>);
-    });
+    // Phase R5: Add to registry instead of replacing (no off() call)
+    _listeners.putIfAbsent('call_ended', () => []).add(callback);
+    
+    // Only register socket listener once per event
+    if (_listeners['call_ended']!.length == 1) {
+      _socket!.on('call_ended', (data) {
+        debugPrint('🔚 [SOCKET] Call ended received');
+        debugPrint('   Data: $data');
+        final callbacks = _listeners['call_ended'] ?? [];
+        for (final cb in callbacks) {
+          cb(data as Map<String, dynamic>);
+        }
+      });
+    }
+    debugPrint('✅ [SOCKET] Listener registered for call_ended (total: ${_listeners['call_ended']?.length ?? 0})');
   }
 
   /// Remove all listeners for a specific event
+  /// Phase R5: Removes from internal registry, but keeps socket listener active
+  /// Use this only when you're sure no other code needs the event
   void off(String event) {
+    _listeners.remove(event);
     _socket?.off(event);
     debugPrint('🔇 [SOCKET] Removed listeners for: $event');
+  }
+  
+  /// Phase R5: Remove a specific callback from an event
+  /// This allows fine-grained cleanup without affecting other listeners
+  void removeListener(String event, Function(Map<String, dynamic>) callback) {
+    final callbacks = _listeners[event];
+    if (callbacks != null) {
+      callbacks.remove(callback);
+      if (callbacks.isEmpty) {
+        _listeners.remove(event);
+        _socket?.off(event);
+        debugPrint('🔇 [SOCKET] Removed last listener for: $event');
+      } else {
+        debugPrint('🔇 [SOCKET] Removed one listener for: $event (remaining: ${callbacks.length})');
+      }
+    }
   }
 
   /// Remove all listeners
   void removeAllListeners() {
     _socket?.clearListeners();
     debugPrint('🔇 [SOCKET] Removed all listeners');
+  }
+
+  /// Listen to creator status changed event (for users to refresh homepage)
+  /// Phase R5: Uses internal registry - multiple listeners supported
+  void onCreatorStatusChanged(Function(Map<String, dynamic>) callback) {
+    if (_socket == null) {
+      debugPrint('⚠️  [SOCKET] Socket not initialized, cannot listen to creator_status_changed');
+      return;
+    }
+
+    // Phase R5: Add to registry instead of replacing
+    _listeners.putIfAbsent('creator_status_changed', () => []).add(callback);
+    
+    // Only register socket listener once per event
+    if (_listeners['creator_status_changed']!.length == 1) {
+      _socket!.on('creator_status_changed', (data) {
+        debugPrint('🔄 [SOCKET] Creator status changed received');
+        debugPrint('   Data: $data');
+        final callbacks = _listeners['creator_status_changed'] ?? [];
+        for (final cb in callbacks) {
+          cb(data as Map<String, dynamic>);
+        }
+      });
+    }
+    debugPrint('✅ [SOCKET] Listener registered for creator_status_changed (total: ${_listeners['creator_status_changed']?.length ?? 0})');
+  }
+
+  /// Listen to coins updated event (single-source-of-truth for balance)
+  /// Phase C2: Uses internal registry - multiple listeners supported
+  void onCoinsUpdated(Function(Map<String, dynamic>) callback) {
+    if (_socket == null) {
+      debugPrint('⚠️  [SOCKET] Socket not initialized, cannot listen to coins_updated');
+      return;
+    }
+
+    _listeners.putIfAbsent('coins_updated', () => []).add(callback);
+
+    if (_listeners['coins_updated']!.length == 1) {
+      _socket!.on('coins_updated', (data) {
+        debugPrint('🪙 [SOCKET] coins_updated received');
+        debugPrint('   Data: $data');
+        final callbacks = _listeners['coins_updated'] ?? [];
+        for (final cb in callbacks) {
+          cb(data as Map<String, dynamic>);
+        }
+      });
+    }
+
+    debugPrint('✅ [SOCKET] Listener registered for coins_updated (total: ${_listeners['coins_updated']?.length ?? 0})');
   }
 }

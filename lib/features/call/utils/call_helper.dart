@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/models/call_model.dart';
+import '../services/call_service.dart';
 
 // Helper functions for initiating and handling calls
 
@@ -50,6 +51,43 @@ Future<CallModel?> initiateVideoCall({
     }
 
     return call;
+  } on InsufficientCoinsException catch (e, stackTrace) {
+    debugPrint('❌ [CALL HELPER] Insufficient coins: $e');
+    debugPrint('   Stack: $stackTrace');
+    // Close loading if still open
+    if (context.mounted) {
+      Navigator.of(context).pop();
+      // Show dialog prompting user to buy more coins
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Not enough coins'),
+            content: Text(
+              e.requiredCoins > 0
+                  ? 'You need at least ${e.requiredCoins} coins to start this call.\n\nYour current balance is ${e.currentCoins} coins.'
+                  : e.message,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  // Navigate to wallet screen to buy coins
+                  context.push('/wallet');
+                },
+                child: const Text('Buy coins'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+    return null;
   } catch (e, stackTrace) {
     debugPrint('❌ [CALL HELPER] Initiate call error: $e');
     debugPrint('   Stack: $stackTrace');

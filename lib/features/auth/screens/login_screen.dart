@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/utils/error_handler.dart';
+import '../../../core/constants/app_spacing.dart';
 import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/ui_primitives.dart';
 import '../providers/auth_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -103,6 +105,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     
     // Listen for authentication state changes to navigate automatically
     // ref.listen MUST be called directly in build() method
@@ -158,257 +162,155 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(ErrorHandler.getHumanReadableError(next.error!)),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
             duration: const Duration(seconds: 5),
           ),
         );
       }
     });
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF2D1B3D), // Match gradient color to prevent white space
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF2D1B3D), // Dark purple-brown
-              const Color(0xFF3D2B4D), // Slightly lighter purple-brown
-              const Color(0xFF2D1B3D), // Back to dark
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
+    return AppScaffold(
+      padded: true,
+      child: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'Login to get started',
+                style: textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: scheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              TextField(
+                controller: _phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile Number',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'You will receive an OTP on this number.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(height: 40),
-                  
-                  // Title
-                  Text(
-                    'Login to get started',
-                    style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: 32,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                  
-                  const SizedBox(height: 40),
-                  
-                  // Mobile Number Input Field
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Mobile Number',
-                      hintStyle: TextStyle(color: Colors.grey[400]),
-                      filled: true,
-                      fillColor: Colors.white.withOpacity(0.1),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: Colors.white.withOpacity(0.2),
-                          width: 1,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(
-                          color: Colors.white,
-                          width: 2,
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
+                  Checkbox(
+                    value: _acceptTerms,
+                    onChanged: (value) {
+                      setState(() {
+                        _acceptTerms = value ?? false;
+                      });
+                    },
+                    activeColor: scheme.primary,
+                    checkColor: scheme.onPrimary,
+                    side: BorderSide(
+                      color: scheme.outlineVariant,
+                      width: 2,
                     ),
                   ),
-                  
-                  const SizedBox(height: 12),
-                  
-                  // Instructional Text
-                  Text(
-                    'You will receive an OTP on this number.',
-                    style: TextStyle(
-                      color: Colors.grey[300],
-                      fontSize: 14,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Terms & Conditions Checkbox
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Checkbox(
-                        value: _acceptTerms,
-                        onChanged: (value) {
-                          setState(() {
-                            _acceptTerms = value ?? false;
-                          });
-                        },
-                        activeColor: Colors.white,
-                        checkColor: const Color(0xFF2D1B3D),
-                        side: BorderSide(
-                          color: Colors.white.withOpacity(0.7),
-                          width: 2,
-                        ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: RichText(
-                            text: TextSpan(
-                              style: TextStyle(
-                                color: Colors.grey[300],
-                                fontSize: 12,
-                                height: 1.5,
-                              ),
-                              children: [
-                                const TextSpan(text: 'I accept '),
-                                TextSpan(
-                                  text: 'terms & conditions',
-                                  style: TextStyle(
-                                    decoration: TextDecoration.underline,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const TextSpan(text: ' and '),
-                                TextSpan(
-                                  text: 'community guidelines',
-                                  style: TextStyle(
-                                    decoration: TextDecoration.underline,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const TextSpan(text: ' of Eaze. I also agree to receiving updates on WhatsApp/SMS.'),
-                              ],
-                            ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: RichText(
+                        text: TextSpan(
+                          style: textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            height: 1.5,
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // Get OTP Button
-                  SizedBox(
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: authState.isLoading || !_acceptTerms
-                          ? null
-                          : _handlePhoneLogin,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF2D1B3D),
-                        disabledBackgroundColor: Colors.grey[600],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: authState.isLoading
-                          ? const LoadingIndicator()
-                          : const Text(
-                              'Get OTP',
+                          children: [
+                            const TextSpan(text: 'I accept '),
+                            TextSpan(
+                              text: 'terms & conditions',
                               style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
+                                decoration: TextDecoration.underline,
+                                color: scheme.primary,
                               ),
                             ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Divider with "OR"
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Divider(
-                          color: Colors.white.withOpacity(0.3),
-                          thickness: 1,
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
-                          'OR',
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Divider(
-                          color: Colors.white.withOpacity(0.3),
-                          thickness: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  // Google Sign In Button
-                  SizedBox(
-                    height: 56,
-                    child: OutlinedButton.icon(
-                      onPressed: authState.isLoading ? null : _handleGoogleSignIn,
-                      icon: authState.isLoading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: LoadingIndicator(size: 20),
-                            )
-                          : const Icon(
-                              Icons.g_mobiledata,
-                              size: 28,
-                              color: Colors.white,
+                            const TextSpan(text: ' and '),
+                            TextSpan(
+                              text: 'community guidelines',
+                              style: TextStyle(
+                                decoration: TextDecoration.underline,
+                                color: scheme.primary,
+                              ),
                             ),
-                      label: const Text(
-                        'Continue with Google',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: Colors.white.withOpacity(0.5),
-                          width: 1.5,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                            const TextSpan(
+                              text:
+                                  ' of Eaze. I also agree to receiving updates on WhatsApp/SMS.',
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                  
-                  const SizedBox(height: 20),
                 ],
               ),
-            ),
+              const SizedBox(height: AppSpacing.lg),
+              PrimaryButton(
+                label: 'Get OTP',
+                onPressed: (authState.isLoading || !_acceptTerms)
+                    ? null
+                    : _handlePhoneLogin,
+                isLoading: authState.isLoading,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: Divider(
+                      color: scheme.outlineVariant,
+                      thickness: 1,
+                    ),
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+                    child: Text(
+                      'OR',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Divider(
+                      color: scheme.outlineVariant,
+                      thickness: 1,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              SecondaryButton(
+                label: 'Continue with Google',
+                onPressed:
+                    authState.isLoading ? null : _handleGoogleSignIn,
+                leading: authState.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: LoadingIndicator(size: 20),
+                      )
+                    : Icon(
+                        Icons.g_mobiledata,
+                        size: 28,
+                        color: scheme.primary,
+                      ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
           ),
         ),
       ),

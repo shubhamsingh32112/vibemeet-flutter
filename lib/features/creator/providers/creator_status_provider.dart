@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/api/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
 
 enum CreatorStatus {
   online,
@@ -26,13 +29,15 @@ enum CreatorStatus {
 /// final isOnline = ref.read(creatorStatusProvider.notifier).isOnline;
 /// ```
 final creatorStatusProvider = StateNotifierProvider<CreatorStatusNotifier, CreatorStatus>((ref) {
-  return CreatorStatusNotifier();
+  return CreatorStatusNotifier(ref);
 });
 
 class CreatorStatusNotifier extends StateNotifier<CreatorStatus> {
   static const String _statusKey = 'creator_status';
+  final Ref _ref;
+  final ApiClient _apiClient = ApiClient();
   
-  CreatorStatusNotifier() : super(CreatorStatus.offline) {
+  CreatorStatusNotifier(this._ref) : super(CreatorStatus.offline) {
     _loadStatus();
   }
 
@@ -47,14 +52,32 @@ class CreatorStatusNotifier extends StateNotifier<CreatorStatus> {
     }
   }
 
-  Future<void> setStatus(CreatorStatus status) async {
+  Future<void> setStatus(CreatorStatus status, {bool syncToBackend = true}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_statusKey, status == CreatorStatus.online);
       state = status;
+      
+      // Sync to backend if user is a creator
+      if (syncToBackend) {
+        final authState = _ref.read(authProvider);
+        final user = authState.user;
+        
+        if (user != null && (user.role == 'creator' || user.role == 'admin')) {
+          try {
+            await _apiClient.patch('/creator/status', data: {
+              'isOnline': status == CreatorStatus.online,
+            });
+            debugPrint('✅ [CREATOR STATUS] Synced to backend: ${status == CreatorStatus.online ? "online" : "offline"}');
+          } catch (e) {
+            debugPrint('⚠️  [CREATOR STATUS] Failed to sync to backend: $e');
+            // Don't fail the status update if backend sync fails
+          }
+        }
+      }
     } catch (e) {
       // Handle error silently or log it
-      print('Error saving creator status: $e');
+      debugPrint('❌ [CREATOR STATUS] Error saving creator status: $e');
     }
   }
 

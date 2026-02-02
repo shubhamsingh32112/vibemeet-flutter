@@ -40,7 +40,6 @@ lib/
 │   ├── auth/         # Authentication
 │   ├── home/         # Home screen
 │   ├── recent/        # Recent screen
-│   ├── chat/         # Chat screen
 │   ├── account/      # Account screen
 │   └── user/         # User providers
 └── shared/           # Shared components

@@ -6,7 +6,8 @@ enum CallStatus {
   ringing,
   accepted,
   rejected,
-  ended;
+  ended,
+  missed;
 
   static CallStatus fromString(String status) {
     switch (status.toLowerCase()) {
@@ -20,6 +21,8 @@ enum CallStatus {
         return CallStatus.rejected;
       case 'ended':
         return CallStatus.ended;
+      case 'missed':
+        return CallStatus.missed;
       default:
         return CallStatus.initiated;
     }
@@ -44,6 +47,9 @@ class CallModel extends Equatable {
   final DateTime? endedAt;
   final int? duration; // Duration in seconds
   final String? durationFormatted; // Human-readable duration (e.g., "5m 30s")
+  // Rating (caller-only visibility from backend)
+  final int? rating; // 1-5
+  final DateTime? ratedAt;
   final CallerInfo? caller;
   final CreatorInfo? creator;
 
@@ -61,6 +67,8 @@ class CallModel extends Equatable {
     this.endedAt,
     this.duration,
     this.durationFormatted,
+    this.rating,
+    this.ratedAt,
     this.caller,
     this.creator,
   });
@@ -88,6 +96,8 @@ class CallModel extends Equatable {
           : null,
       duration: json['duration'] as int?,
       durationFormatted: json['durationFormatted'] as String?,
+      rating: (json['rating'] is num) ? (json['rating'] as num).toInt() : null,
+      ratedAt: json['ratedAt'] != null ? DateTime.parse(json['ratedAt'] as String) : null,
       caller: json['caller'] != null
           ? CallerInfo.fromJson(json['caller'] as Map<String, dynamic>)
           : null,
@@ -112,6 +122,8 @@ class CallModel extends Equatable {
       'endedAt': endedAt?.toIso8601String(),
       'duration': duration,
       'durationFormatted': durationFormatted,
+      'rating': rating,
+      'ratedAt': ratedAt?.toIso8601String(),
       'caller': caller?.toJson(),
       'creator': creator?.toJson(),
     };
@@ -131,6 +143,8 @@ class CallModel extends Equatable {
     DateTime? endedAt,
     int? duration,
     String? durationFormatted,
+    int? rating,
+    DateTime? ratedAt,
     CallerInfo? caller,
     CreatorInfo? creator,
   }) {
@@ -148,6 +162,8 @@ class CallModel extends Equatable {
       endedAt: endedAt ?? this.endedAt,
       duration: duration ?? this.duration,
       durationFormatted: durationFormatted ?? this.durationFormatted,
+      rating: rating ?? this.rating,
+      ratedAt: ratedAt ?? this.ratedAt,
       caller: caller ?? this.caller,
       creator: creator ?? this.creator,
     );
@@ -168,6 +184,8 @@ class CallModel extends Equatable {
         endedAt,
         duration,
         durationFormatted,
+        rating,
+        ratedAt,
         caller,
         creator,
       ];

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/utils/error_handler.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/ui_primitives.dart';
 import '../providers/auth_provider.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
@@ -131,9 +131,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     if (otp.length != 6) {
       debugPrint('⚠️  [OTP] Invalid OTP length: ${otp.length}');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the complete 6-digit code'),
-          backgroundColor: Colors.orange,
+        SnackBar(
+          content: const Text('Please enter the complete 6-digit code'),
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
         ),
       );
       return;
@@ -162,7 +162,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(ErrorHandler.getHumanReadableError(authState.error!)),
-              backgroundColor: Colors.red,
+              backgroundColor: Theme.of(context).colorScheme.error,
             ),
           );
         }
@@ -186,7 +186,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Verification failed: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
         // Clear OTP fields on error
@@ -227,7 +227,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(ErrorHandler.getHumanReadableError(authState.error!)),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       } else if (authState.verificationId != null && mounted) {
@@ -237,9 +237,9 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification code resent successfully'),
-            backgroundColor: Colors.green,
+          SnackBar(
+            content: const Text('Verification code resent successfully'),
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           ),
         );
         _startResendCountdown();
@@ -250,7 +250,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to resend code: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -291,152 +291,150 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       }
     });
     
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         title: const Text('Verify Phone Number'),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Icon(
-                Icons.sms_outlined,
-                size: 64,
-                color: Theme.of(context).colorScheme.primary,
-              )
-                  .animate()
-                  .fadeIn(duration: 500.ms)
-                  .scale(delay: 200.ms),
-              const SizedBox(height: 24),
-              Text(
-                'Enter Verification Code',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(delay: 300.ms),
-              const SizedBox(height: 8),
-              Text(
-                'We sent a 6-digit code to\n${widget.phoneNumber}',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                textAlign: TextAlign.center,
-              )
-                  .animate()
-                  .fadeIn(delay: 400.ms),
-              const SizedBox(height: 48),
-              
-              // OTP Input Fields
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(6, (index) {
-                  return SizedBox(
-                    width: 45,
-                    height: 60,
-                    child: TextField(
-                      controller: _controllers[index],
-                      focusNode: _focusNodes[index],
-                      textAlign: TextAlign.center,
-                      keyboardType: TextInputType.number,
-                      maxLength: 1,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      decoration: InputDecoration(
-                        counterText: '',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+      padded: false,
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Icon(
+              Icons.sms_outlined,
+              size: 64,
+              color: Theme.of(context).colorScheme.primary,
+            )
+                .animate()
+                .fadeIn(duration: 500.ms)
+                .scale(delay: 200.ms),
+            const SizedBox(height: 24),
+            Text(
+              'Enter Verification Code',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+            )
+                .animate()
+                .fadeIn(delay: 300.ms),
+            const SizedBox(height: 8),
+            Text(
+              'We sent a 6-digit code to\n${widget.phoneNumber}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.center,
+            )
+                .animate()
+                .fadeIn(delay: 400.ms),
+            const SizedBox(height: 48),
+
+            // OTP Input Fields
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: List.generate(6, (index) {
+                return SizedBox(
+                  width: 45,
+                  height: 60,
+                  child: TextField(
+                    controller: _controllers[index],
+                    focusNode: _focusNodes[index],
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    maxLength: 1,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: Theme.of(context).colorScheme.primary,
-                            width: 2,
-                          ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    decoration: InputDecoration(
+                      counterText: '',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.primary,
+                          width: 2,
                         ),
                       ),
-                      onChanged: (value) => _onCodeChanged(index, value),
-                      onTap: () {
-                        // Select all text when tapped
-                        _controllers[index].selection = TextSelection(
-                          baseOffset: 0,
-                          extentOffset: _controllers[index].text.length,
-                        );
-                      },
                     ),
-                  )
-                      .animate(delay: (index * 50).ms)
-                      .fadeIn()
-                      .scale(begin: const Offset(0.8, 0.8));
-                }),
-              ),
-              
-              const SizedBox(height: 32),
-              
-              // Verify Button
-              ElevatedButton(
-                onPressed: _isLoading ? null : _verifyOtp,
-                child: _isLoading
-                    ? const LoadingIndicator()
-                    : const Text('Verify'),
-              )
-                  .animate()
-                  .fadeIn(delay: 600.ms),
-              
-              const SizedBox(height: 24),
-              
-              // Resend Code
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Didn't receive the code? ",
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    onChanged: (value) => _onCodeChanged(index, value),
+                    onTap: () {
+                      // Select all text when tapped
+                      _controllers[index].selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: _controllers[index].text.length,
+                      );
+                    },
                   ),
-                  if (_canResend)
-                    TextButton(
-                      onPressed: _isLoading ? null : _resendCode,
-                      child: const Text('Resend'),
-                    )
-                  else
-                    Text(
-                      'Resend in ${_resendCountdown}s',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey,
-                          ),
-                    ),
-                ],
-              )
-                  .animate()
-                  .fadeIn(delay: 700.ms),
-              
-              const SizedBox(height: 16),
-              
-              // Change Phone Number
-              TextButton(
-                onPressed: _isLoading
-                    ? null
-                    : () {
-                        debugPrint('🔄 [OTP] User wants to change phone number');
-                        // Clear verification state
-                        ref.read(authProvider.notifier).clearVerificationState();
-                        context.pop();
-                      },
-                child: const Text('Change Phone Number'),
-              )
-                  .animate()
-                  .fadeIn(delay: 800.ms),
-            ],
-          ),
+                )
+                    .animate(delay: (index * 50).ms)
+                    .fadeIn()
+                    .scale(begin: const Offset(0.8, 0.8));
+              }),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Verify Button
+            PrimaryButton(
+              label: 'Verify',
+              onPressed: _isLoading ? null : _verifyOtp,
+              isLoading: _isLoading,
+            )
+                .animate()
+                .fadeIn(delay: 600.ms),
+
+            const SizedBox(height: 24),
+
+            // Resend Code
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  "Didn't receive the code? ",
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (_canResend)
+                  TextButton(
+                    onPressed: _isLoading ? null : _resendCode,
+                    child: const Text('Resend'),
+                  )
+                else
+                  Text(
+                    'Resend in ${_resendCountdown}s',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+              ],
+            )
+                .animate()
+                .fadeIn(delay: 700.ms),
+
+            const SizedBox(height: 16),
+
+            // Change Phone Number
+            TextButton(
+              onPressed: _isLoading
+                  ? null
+                  : () {
+                      debugPrint('🔄 [OTP] User wants to change phone number');
+                      // Clear verification state
+                      ref.read(authProvider.notifier).clearVerificationState();
+                      context.pop();
+                    },
+              child: const Text('Change Phone Number'),
+            )
+                .animate()
+                .fadeIn(delay: 800.ms),
+          ],
         ),
       ),
     );

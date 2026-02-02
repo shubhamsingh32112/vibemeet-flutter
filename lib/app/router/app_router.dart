@@ -6,11 +6,13 @@ import '../../features/auth/screens/otp_screen.dart';
 import '../../features/onboarding/screens/gender_selection_screen.dart';
 import '../../features/home/screens/home_screen.dart';
 import '../../features/recent/screens/recent_screen.dart';
-import '../../features/chat/screens/chat_screen.dart';
 import '../../features/account/screens/account_screen.dart';
 import '../../features/account/screens/edit_profile_screen.dart';
 import '../../features/call/screens/video_call_screen.dart';
 import '../../features/call/screens/incoming_call_screen.dart';
+import '../../features/wallet/screens/wallet_screen.dart';
+import '../../features/wallet/screens/transactions_screen.dart';
+import '../../features/creator/screens/creator_tasks_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/splash',
@@ -52,10 +54,6 @@ final appRouter = GoRouter(
       path: '/recent',
       builder: (context, state) => const RecentScreen(),
     ),
-    GoRoute(
-      path: '/chat',
-      builder: (context, state) => const ChatScreen(),
-    ),
           GoRoute(
             path: '/account',
             builder: (context, state) => const AccountScreen(),
@@ -63,6 +61,22 @@ final appRouter = GoRouter(
           GoRoute(
             path: '/edit-profile',
             builder: (context, state) => const EditProfileScreen(),
+          ),
+          GoRoute(
+            path: '/wallet',
+            builder: (context, state) => const WalletScreen(),
+          ),
+          GoRoute(
+            path: '/transactions',
+            builder: (context, state) => const TransactionsScreen(),
+          ),
+          GoRoute(
+            path: '/creator/tasks',
+            builder: (context, state) {
+              // 🔒 PHASE T2: Role guard at route level (backend also checks, but never trust just UI)
+              // This is handled in the screen itself, but we can add a redirect here too
+              return const CreatorTasksScreen();
+            },
           ),
     GoRoute(
       path: '/video-call',

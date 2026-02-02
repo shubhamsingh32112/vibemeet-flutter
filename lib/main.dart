@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'app/router/app_router.dart';
+import 'app/widgets/app_lifecycle_wrapper.dart';
 import 'core/theme/app_theme.dart';
 
 bool _firebaseInitialized = false;
@@ -36,11 +37,13 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Eazy Talks',
-      theme: AppTheme.lightTheme,
-      routerConfig: appRouter,
-      debugShowCheckedModeBanner: false,
+    return AppLifecycleWrapper(
+      child: MaterialApp.router(
+        title: 'Eazy Talks',
+        theme: AppTheme.darkTheme,
+        routerConfig: appRouter,
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }

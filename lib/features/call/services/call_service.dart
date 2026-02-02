@@ -3,6 +3,22 @@ import 'package:flutter/foundation.dart';
 import '../../../core/api/api_client.dart';
 import '../../../shared/models/call_model.dart';
 
+/// Thrown when the caller does not have enough coins to start a call.
+class InsufficientCoinsException implements Exception {
+  final int requiredCoins;
+  final int currentCoins;
+  final String message;
+
+  InsufficientCoinsException({
+    required this.requiredCoins,
+    required this.currentCoins,
+    required this.message,
+  });
+
+  @override
+  String toString() => message;
+}
+
 class CallService {
   final ApiClient _apiClient = ApiClient();
 
@@ -52,6 +68,26 @@ class CallService {
     } on DioException catch (e) {
       debugPrint('❌ [CALL API] Initiate call failed: ${e.response?.statusCode}');
       debugPrint('   Error: ${e.message}');
+      // 402: Insufficient coins – surface as a typed exception for UI
+      if (e.response?.statusCode == 402) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic>) {
+          final requiredCoins = data['requiredCoins'] is num ? (data['requiredCoins'] as num).toInt() : 0;
+          final currentCoins = data['currentCoins'] is num ? (data['currentCoins'] as num).toInt() : 0;
+          final message = data['message'] as String? ??
+              'You do not have enough coins to start this call.';
+          throw InsufficientCoinsException(
+            requiredCoins: requiredCoins,
+            currentCoins: currentCoins,
+            message: message,
+          );
+        }
+        throw InsufficientCoinsException(
+          requiredCoins: 0,
+          currentCoins: 0,
+          message: 'You do not have enough coins to start this call.',
+        );
+      }
       if (e.response?.statusCode == 409) {
         debugPrint('   Reason: Creator is busy');
         // Creator busy
@@ -102,15 +138,23 @@ class CallService {
         debugPrint('   Token: ${token.substring(0, 20)}...');
         debugPrint('   UID: $uid');
         
-        // Get full call status to get all details
-        debugPrint('🔄 [CALL API] Fetching full call status...');
-        final callStatus = await getCallStatus(callId);
-        debugPrint('✅ [CALL API] Full call status retrieved');
-        return callStatus.copyWith(
-          token: token,
-          uid: uid,
-          status: CallStatus.accepted,
-        );
+        // Phase R4: Trust POST response - only fetch if backend doesn't return full call data
+        // Check if response includes full call object
+        if (data.containsKey('callId') && data.containsKey('channelName')) {
+          // Backend returned full call object - use it directly
+          debugPrint('✅ [CALL API] Full call data in response, using directly (Phase R4)');
+          return CallModel.fromJson(data);
+        } else {
+          // Backend only returned token/uid - fetch full status once
+          debugPrint('🔄 [CALL API] Partial response, fetching full call status...');
+          final callStatus = await getCallStatus(callId);
+          debugPrint('✅ [CALL API] Full call status retrieved');
+          return callStatus.copyWith(
+            token: token,
+            uid: uid,
+            status: CallStatus.accepted,
+          );
+        }
       } else {
         final error = responseData['error'] as String?;
         throw Exception(error ?? 'Failed to accept call');
@@ -150,6 +194,54 @@ class CallService {
       throw Exception(e.response?.data['error'] ?? 'Failed to end call');
     } catch (e) {
       debugPrint('❌ [CALL API] End call unexpected error: $e');
+      rethrow;
+    }
+  }
+
+  /// Rate a creator for a specific call (caller only).
+  /// Backend enforces: call must be ended, caller-only, one-time.
+  Future<void> rateCall({
+    required String callId,
+    required int rating, // 1-5
+  }) async {
+    debugPrint('⭐ [CALL API] Rating call: $callId with $rating star(s)');
+    if (rating < 1 || rating > 5) {
+      throw Exception('Rating must be between 1 and 5');
+    }
+
+    try {
+      final response = await _apiClient.post(
+        '/calls/$callId/rating',
+        data: {'rating': rating},
+      );
+
+      debugPrint('📥 [CALL API] Rate call response: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        debugPrint('✅ [CALL API] Call rated successfully');
+        return;
+      }
+
+      // Guard response parsing
+      if (response.data is Map<String, dynamic>) {
+        final responseData = response.data as Map<String, dynamic>;
+        final error = responseData['error'] as String?;
+        throw Exception(error ?? 'Failed to rate call');
+      }
+      throw Exception('Failed to rate call');
+    } on DioException catch (e) {
+      // Treat "already rated" as non-fatal (idempotent UX)
+      if (e.response?.statusCode == 409) {
+        debugPrint('⚠️  [CALL API] Call already rated (409) - ignoring');
+        return;
+      }
+      final responseData = e.response?.data;
+      if (responseData is Map<String, dynamic>) {
+        final error = responseData['error'] as String?;
+        throw Exception(error ?? 'Failed to rate call');
+      }
+      throw Exception('Failed to rate call');
+    } catch (_) {
+      debugPrint('❌ [CALL API] Rate call unexpected error');
       rethrow;
     }
   }
@@ -211,7 +303,7 @@ class CallService {
         final error = responseData['error'] as String?;
         throw Exception(error ?? 'Failed to get call status');
       }
-    } on DioException catch (e) {
+    } on DioException catch (_) {
       // Re-throw DioException (including 429) to be handled by caller
       rethrow;
     } catch (e) {
@@ -244,6 +336,39 @@ class CallService {
       throw Exception(e.response?.data['error'] ?? 'Failed to get incoming calls');
     } catch (e) {
       debugPrint('❌ [CALL API] Get incoming calls unexpected error: $e');
+      rethrow;
+    }
+  }
+
+  // Recent calls for both users & creators
+  Future<List<CallModel>> getRecentCalls() async {
+    debugPrint('🕘 [CALL API] Getting recent calls...');
+    try {
+      final response = await _apiClient.get('/calls/recent');
+      debugPrint('📥 [CALL API] Get recent calls response: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
+        final responseData = response.data as Map<String, dynamic>;
+        if (responseData['success'] == true) {
+          final data = responseData['data'] as Map<String, dynamic>;
+          final calls = (data['calls'] as List<dynamic>? ?? const []);
+          final callList = calls
+              .whereType<Map<String, dynamic>>()
+              .map((call) => CallModel.fromJson(call))
+              .toList();
+          debugPrint('✅ [CALL API] Found ${callList.length} recent call(s)');
+          return callList;
+        }
+        throw Exception(responseData['error'] ?? 'Failed to get recent calls');
+      }
+
+      throw Exception('Failed to get recent calls');
+    } on DioException catch (e) {
+      debugPrint('❌ [CALL API] Get recent calls failed: ${e.response?.statusCode}');
+      debugPrint('   Error: ${e.message}');
+      throw Exception(e.response?.data['error'] ?? 'Failed to get recent calls');
+    } catch (e) {
+      debugPrint('❌ [CALL API] Get recent calls unexpected error: $e');
       rethrow;
     }
   }

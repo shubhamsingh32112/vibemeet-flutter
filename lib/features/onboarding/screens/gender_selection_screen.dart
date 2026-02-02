@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/api/api_client.dart';
 import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/welcome_dialog.dart';
+import '../../../core/services/welcome_service.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class GenderSelectionScreen extends ConsumerStatefulWidget {
@@ -16,7 +18,51 @@ class GenderSelectionScreen extends ConsumerStatefulWidget {
 class _GenderSelectionScreenState extends ConsumerState<GenderSelectionScreen> {
   String? _selectedGender;
   bool _isLoading = false;
+  bool _welcomeDialogShown = false;
   final ApiClient _apiClient = ApiClient();
+
+  @override
+  void initState() {
+    super.initState();
+    // Check and show welcome dialog if needed
+    _checkAndShowWelcomeDialog();
+  }
+
+  Future<void> _checkAndShowWelcomeDialog() async {
+    // Wait for the first frame to ensure context is available
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    if (!mounted) return;
+    
+    // Check if user is authenticated
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated) {
+      return; // Don't show welcome dialog if not authenticated
+    }
+    
+    // Check if user has seen the welcome dialog
+    final hasSeen = await WelcomeService.hasSeenWelcome();
+    if (!hasSeen && !_welcomeDialogShown && mounted) {
+      _welcomeDialogShown = true;
+      _showWelcomeDialog();
+    }
+  }
+
+  void _showWelcomeDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User must click "I agree"
+      builder: (context) => WelcomeDialog(
+        onAgree: () async {
+          // Mark as seen
+          await WelcomeService.markWelcomeAsSeen();
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+      ),
+    );
+  }
 
   Future<void> _saveGender() async {
     if (_selectedGender == null) {

@@ -8,6 +8,8 @@ class CreatorModel extends Equatable {
   final String photo;
   final List<String>? categories;
   final double price;
+  final bool isOnline;
+  final bool isFavorite; // User-only: whether current user favorited this creator
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -19,6 +21,8 @@ class CreatorModel extends Equatable {
     required this.photo,
     this.categories,
     required this.price,
+    this.isOnline = false,
+    this.isFavorite = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -34,6 +38,8 @@ class CreatorModel extends Equatable {
           ? List<String>.from(json['categories'] as List)
           : null,
       price: (json['price'] as num).toDouble(),
+      isOnline: json['isOnline'] as bool? ?? false,
+      isFavorite: json['isFavorite'] as bool? ?? false,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
           : null,
@@ -52,6 +58,8 @@ class CreatorModel extends Equatable {
       'photo': photo,
       'categories': categories,
       'price': price,
+      'isOnline': isOnline,
+      'isFavorite': isFavorite,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
@@ -66,6 +74,8 @@ class CreatorModel extends Equatable {
         photo,
         categories,
         price,
+        isOnline,
+        isFavorite,
         createdAt,
         updatedAt,
       ];

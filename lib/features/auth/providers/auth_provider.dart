@@ -61,6 +61,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient = ApiClient();
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   bool _isInitializing = false;
+  bool _coinsListenerRegistered = false;
 
   AuthNotifier() : super(AuthState()) {
     _initialize();
@@ -113,6 +114,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     if (_auth == null) return;
     
     debugPrint('🔐 [AUTH] Setting up auth state listener...');
+
+    // Phase C2: Register coins_updated listener once (single writer for coins)
+    _registerCoinsListenerOnce();
+
     _auth!.authStateChanges().listen((user) async {
       if (user != null) {
         debugPrint('👤 [AUTH] Auth state changed: User logged in');
@@ -277,6 +282,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         try {
           await SocketService().connect();
           debugPrint('🔌 [AUTH] Socket.IO connected for real-time events');
+
+          // Phase C2: Ensure coins listener is registered after socket connect
+          _registerCoinsListenerOnce();
         } catch (e) {
           debugPrint('⚠️  [AUTH] Failed to connect Socket.IO: $e');
           // Don't fail login if socket connection fails
@@ -794,21 +802,117 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Refresh user data from backend (gets latest coins balance, etc.)
+  /// Uses /user/me endpoint for efficient refresh without full login flow
   Future<void> refreshUser() async {
-    debugPrint('🔄 [AUTH] Refreshing user data...');
+    debugPrint('🔄 [AUTH] Refreshing user data from backend...');
     
-    if (_auth != null) {
-      final user = _auth!.currentUser;
-      if (user != null) {
-        debugPrint('   🆔 Current user: ${user.uid}');
-        debugPrint('   📧 Email: ${user.email ?? "N/A"}');
-        await _syncUserToBackend(user);
-      } else {
-        debugPrint('⚠️  [AUTH] No current user to refresh');
-      }
-    } else {
+    if (_auth == null) {
       debugPrint('❌ [AUTH] Firebase Auth not initialized');
+      return;
     }
+    
+    final firebaseUser = _auth!.currentUser;
+    if (firebaseUser == null) {
+      debugPrint('⚠️  [AUTH] No current user to refresh');
+      return;
+    }
+    
+    try {
+      debugPrint('   🆔 Current user: ${firebaseUser.uid}');
+      
+      // Use /user/me endpoint for efficient refresh (faster than full login)
+      final response = await _apiClient.get('/user/me');
+      
+      if (response.statusCode == 200 && response.data['success'] == true) {
+        final responseData = response.data['data'] as Map<String, dynamic>;
+        
+        // Parse user data (handles both regular user and creator formats)
+        UserModel user;
+        if (responseData.containsKey('user')) {
+          // Regular user - nested structure
+          final userData = responseData['user'] as Map<String, dynamic>;
+          user = UserModel.fromJson(userData);
+          debugPrint('✅ [AUTH] User data refreshed (regular user)');
+        } else {
+          // Creator - flat structure
+          user = UserModel(
+            id: responseData['id'] as String,
+            email: responseData['email'] as String?,
+            phone: responseData['phone'] as String?,
+            gender: responseData['gender'] as String?,
+            username: responseData['name'] as String?,
+            avatar: responseData['photo'] as String?,
+            categories: responseData['categories'] != null
+                ? List<String>.from(responseData['categories'] as List)
+                : null,
+            usernameChangeCount: responseData['usernameChangeCount'] as int? ?? 0,
+            coins: responseData['coins'] as int? ?? 0,
+            role: responseData['role'] as String? ?? 'creator',
+            createdAt: responseData['createdAt'] != null
+                ? DateTime.parse(responseData['createdAt'] as String)
+                : null,
+            updatedAt: responseData['updatedAt'] != null
+                ? DateTime.parse(responseData['updatedAt'] as String)
+                : null,
+          );
+          debugPrint('✅ [AUTH] User data refreshed (creator)');
+        }
+        
+        debugPrint('   💰 Updated coins balance: ${user.coins}');
+        
+        // Update state with refreshed user data
+        state = state.copyWith(user: user, isLoading: false);
+        debugPrint('✅ [AUTH] User data updated in state');
+      } else {
+        debugPrint('⚠️  [AUTH] Failed to refresh user data: ${response.data['error']}');
+      }
+    } catch (e) {
+      debugPrint('❌ [AUTH] Error refreshing user data: $e');
+      // Don't update state on error - keep existing data
+    }
+  }
+
+  /// Phase C2: Single listener for coins_updated that updates authProvider state.
+  /// This is the ONLY writer for displayed coin balance.
+  void _registerCoinsListenerOnce() {
+    if (_coinsListenerRegistered) return;
+
+    // Listener registration requires socket to be initialized; if not, we'll retry after connect()
+    if (SocketService().socket == null) {
+      return;
+    }
+
+    _coinsListenerRegistered = true;
+    SocketService().onCoinsUpdated((data) async {
+      try {
+        final userId = data['userId'] as String?;
+        final coins = data['coins'];
+
+        final currentUser = state.user;
+        if (currentUser == null) return;
+        if (userId == null) return;
+        if (userId != currentUser.id) return;
+
+        final newCoins = coins is num ? coins.toInt() : int.tryParse(coins?.toString() ?? '');
+        if (newCoins == null) return;
+
+        if (newCoins == currentUser.coins) return;
+
+        debugPrint('🪙 [AUTH] coins_updated applied: ${currentUser.coins} → $newCoins');
+
+        // Update in-memory state (UI authority)
+        state = state.copyWith(
+          user: currentUser.copyWith(coins: newCoins),
+        );
+
+        // Persist (same place login writes)
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(AppConstants.keyUserCoins, newCoins);
+      } catch (e) {
+        debugPrint('⚠️  [AUTH] coins_updated handler error (non-fatal): $e');
+      }
+    });
   }
 
   Future<void> verifyOtp(String verificationId, String otp) async {

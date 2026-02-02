@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/api/api_client.dart';
-import '../../../shared/widgets/loading_indicator.dart';
+import '../../../shared/widgets/ui_primitives.dart';
+import '../../../shared/styles/app_brand_styles.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -87,13 +88,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
+    final scheme = Theme.of(context).colorScheme;
     // Validate username
     final username = _usernameController.text.trim();
     if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a username'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please enter a username'),
+          backgroundColor: scheme.error,
         ),
       );
       return;
@@ -101,9 +103,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     if (username.length < 4 || username.length > 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Username must be 4-10 characters'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Username must be 4-10 characters'),
+          backgroundColor: scheme.error,
         ),
       );
       return;
@@ -112,9 +114,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     // Validate categories
     if (_selectedCategories.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least 1 category'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please select at least 1 category'),
+          backgroundColor: scheme.error,
         ),
       );
       return;
@@ -122,9 +124,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     if (_selectedCategories.length > 4) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select maximum 4 categories'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('Please select maximum 4 categories'),
+          backgroundColor: scheme.error,
         ),
       );
       return;
@@ -171,9 +173,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile updated successfully'),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: const Text('Profile updated successfully'),
+              backgroundColor: scheme.surfaceVariant,
             ),
           );
           context.pop();
@@ -187,7 +189,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to save profile: ${e.toString()}'),
-            backgroundColor: Colors.red,
+            backgroundColor: scheme.error,
           ),
         );
       }
@@ -206,6 +208,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = authState.user;
     final availableAvatars = _getAvailableAvatars();
     final remainingChanges = user != null ? 3 - (user.usernameChangeCount) : 3;
+    final scheme = Theme.of(context).colorScheme;
     
     // Update selected avatar if it's not in the current list
     if (_selectedAvatar != null && !availableAvatars.contains(_selectedAvatar!)) {
@@ -218,63 +221,48 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       });
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF2D1B3D),
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              const Color(0xFF2D1B3D),
-              const Color(0xFF3D2B4D),
-              const Color(0xFF2D1B3D),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => context.pop(),
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'Edit Profile',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
+    return AppScaffold(
+      padded: false,
+      child: Column(
+        children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    onPressed: () => context.pop(),
+                    icon: Icon(Icons.arrow_back, color: scheme.onSurface),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'Edit Profile',
+                      style: TextStyle(
+                        color: scheme.onSurface,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
+                      textAlign: TextAlign.center,
                     ),
-                    const SizedBox(width: 48), // Balance the back button
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 48), // Balance the back button
+                ],
               ),
-              
-              // Content
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+            ),
+            
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                       // Avatar Selection - Only show for non-creators
                       if (user?.role != 'creator' && user?.role != 'admin') ...[
-                        const Text(
+                        Text(
                           'Your Avatar',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: scheme.onSurface,
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
@@ -320,18 +308,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: isSelected
-                                              ? Colors.white
-                                              : Colors.white.withOpacity(0.3),
-                                          width: isSelected ? 4 : 2,
+                                              ? AppBrandGradients.avatarCarouselSelectedBorder
+                                              : AppBrandGradients.avatarCarouselUnselectedBorder,
+                                          width: isSelected
+                                              ? AppBrandGradients.avatarCarouselSelectedBorderWidth
+                                              : AppBrandGradients.avatarCarouselUnselectedBorderWidth,
                                         ),
                                         boxShadow: isSelected
-                                            ? [
-                                                BoxShadow(
-                                                  color: Colors.white.withOpacity(0.3),
-                                                  blurRadius: 20,
-                                                  spreadRadius: 5,
-                                                ),
-                                              ]
+                                            ? [AppBrandGradients.avatarCarouselGlow]
                                             : null,
                                       ),
                                       child: ClipOval(
@@ -340,10 +324,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                           fit: BoxFit.cover,
                                           errorBuilder: (context, error, stackTrace) {
                                             return Container(
-                                              color: Colors.grey[800],
-                                              child: const Icon(
+                                              color: scheme.surfaceContainerHigh,
+                                              child: Icon(
                                                 Icons.person,
-                                                color: Colors.white,
+                                                color: scheme.onSurfaceVariant,
                                                 size: 40,
                                               ),
                                             );
@@ -361,21 +345,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         const SizedBox(height: 40),
                       ] else ...[
                         // For creators, show a message that their photo is managed in admin dashboard
-                        Container(
+                        AppCard(
                           padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.amber.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.amber.withOpacity(0.5),
-                              width: 1,
-                            ),
-                          ),
                           child: Row(
                             children: [
                               Icon(
                                 Icons.info_outline,
-                                color: Colors.amber[300],
+                                color: scheme.primary,
                                 size: 24,
                               ),
                               const SizedBox(width: 12),
@@ -383,7 +359,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 child: Text(
                                   'Your profile photo is managed in the admin dashboard.',
                                   style: TextStyle(
-                                    color: Colors.amber[100],
+                                    color: scheme.onSurfaceVariant,
                                     fontSize: 14,
                                   ),
                                 ),
@@ -395,36 +371,41 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ],
                       
                       // Username Field
-                      const Text(
+                      Text(
                         'Username *',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurface,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: _usernameController,
-                        style: const TextStyle(color: Colors.white),
+                        style: TextStyle(
+                          color: scheme.onSurface,
+                        ),
                         decoration: InputDecoration(
                           filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
+                          fillColor: scheme.surfaceContainerHigh,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
+                            borderSide: BorderSide(
+                              color: scheme.outlineVariant,
+                              width: 1,
+                            ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.2),
+                              color: scheme.outlineVariant,
                               width: 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(
-                              color: Colors.white,
+                            borderSide: BorderSide(
+                              color: scheme.primary,
                               width: 2,
                             ),
                           ),
@@ -440,7 +421,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           Text(
                             'Can change username $remainingChanges more time${remainingChanges != 1 ? 's' : ''}.',
                             style: TextStyle(
-                              color: Colors.grey[400],
+                              color: scheme.onSurfaceVariant,
                               fontSize: 12,
                             ),
                           ),
@@ -450,7 +431,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       Text(
                         'Username must be 4-10 characters.',
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: scheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -458,13 +439,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       const SizedBox(height: 40),
                       
                       // Category Selection
-                      const Text(
+                      Text(
                         'Select a category *',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: scheme.onSurface,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       const SizedBox(height: 16),
                       
@@ -483,9 +464,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                     _selectedCategories.add(category);
                                   } else {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('Maximum 4 categories allowed'),
-                                        backgroundColor: Colors.orange,
+                                      SnackBar(
+                                        content: const Text('Maximum 4 categories allowed'),
+                                        backgroundColor: scheme.error,
                                       ),
                                     );
                                   }
@@ -498,29 +479,21 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 vertical: 12,
                               ),
                               decoration: BoxDecoration(
-                                gradient: isSelected
-                                    ? LinearGradient(
-                                        colors: [
-                                          Colors.white.withOpacity(0.2),
-                                          Colors.white.withOpacity(0.1),
-                                        ],
-                                      )
-                                    : null,
                                 color: isSelected
-                                    ? null
-                                    : Colors.white.withOpacity(0.05),
+                                    ? scheme.primaryContainer
+                                    : scheme.surfaceContainerHigh,
                                 borderRadius: BorderRadius.circular(20),
                                 border: Border.all(
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.white.withOpacity(0.2),
-                                  width: isSelected ? 2 : 1,
+                                  color: scheme.outlineVariant,
+                                  width: 1,
                                 ),
                               ),
                               child: Text(
                                 category,
                                 style: TextStyle(
-                                  color: Colors.white,
+                                  color: isSelected
+                                      ? scheme.onPrimaryContainer
+                                      : scheme.onSurface,
                                   fontSize: 14,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
@@ -539,7 +512,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       Text(
                         'Select a minimum of 1 and maximum of 4.',
                         style: TextStyle(
-                          color: Colors.grey[400],
+                          color: scheme.onSurfaceVariant,
                           fontSize: 12,
                         ),
                       ),
@@ -549,26 +522,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       // Save Button
                       SizedBox(
                         height: 56,
-                        child: ElevatedButton(
+                        child: PrimaryButton(
+                          label: 'Save',
                           onPressed: _isLoading ? null : _saveProfile,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2D1B3D),
-                            disabledBackgroundColor: Colors.grey[600],
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isLoading
-                              ? const LoadingIndicator()
-                              : const Text(
-                                  'Save',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                          isLoading: _isLoading,
                         ),
                       ),
                       
@@ -577,9 +534,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
+        ],
       ),
     );
   }

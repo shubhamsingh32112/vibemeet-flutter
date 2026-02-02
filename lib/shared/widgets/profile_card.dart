@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../models/creator_model.dart';
 import '../models/profile_model.dart';
 import '../../features/call/services/call_service.dart';
+import '../../features/call/utils/call_helper.dart';
+import 'avatar_widget.dart';
 
 class ProfileCard extends StatelessWidget {
   final CreatorModel? creator;
@@ -64,49 +65,10 @@ class ProfileCard extends StatelessWidget {
                     ),
                   ),
                   child: ClipOval(
-                    child: creator.photo.startsWith('http') || creator.photo.startsWith('data:')
-                        ? Image.network(
-                            creator.photo,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.purple[400],
-                                child: Center(
-                                  child: Text(
-                                    creator.name.isNotEmpty
-                                        ? creator.name[0].toUpperCase()
-                                        : 'C',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          )
-                        : Image.asset(
-                            creator.photo,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.purple[400],
-                                child: Center(
-                                  child: Text(
-                                    creator.name.isNotEmpty
-                                        ? creator.name[0].toUpperCase()
-                                        : 'C',
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+                    child: AvatarWidget(
+                      creator: creator,
+                      size: 60,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -179,85 +141,61 @@ class ProfileCard extends StatelessWidget {
                 }).toList(),
               ),
             const SizedBox(height: 12),
-            // Pricing and Video Call Button
+            // Pricing and Action Buttons
             Row(
               children: [
                 // Call Price
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.phone,
-                        size: 16,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'e${creator.price.toInt()}/min',
-                        style: TextStyle(
-                          color: Colors.grey[200],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                // Video Call Price
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.videocam,
-                        size: 16,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'e${(creator.price * 3).toInt()}/min',
-                        style: TextStyle(
-                          color: Colors.grey[200],
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Spacer(),
-                // Video Call Button
-                ElevatedButton.icon(
-                  onPressed: () => _initiateVideoCall(context, creator),
-                  icon: const Icon(Icons.videocam, size: 18),
-                  label: const Text('Video Call'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
+                Flexible(
+                  child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+                      horizontal: 12,
+                      vertical: 8,
                     ),
-                    shape: RoundedRectangleBorder(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.phone,
+                          size: 16,
+                          color: Colors.grey[300],
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            '${creator.price.toInt()} coins/min',
+                            style: TextStyle(
+                              color: Colors.grey[200],
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Video Call Button with Price
+                Flexible(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _initiateVideoCall(context, creator),
+                    icon: const Icon(Icons.videocam, size: 18),
+                    label: Text('${creator.price.toInt()} coins/min'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ),
@@ -277,55 +215,12 @@ class ProfileCard extends StatelessWidget {
     debugPrint('   Creator User ID: ${creator.userId}');
 
     final callService = CallService();
-    
-    try {
-      debugPrint('🔄 [HOME] Showing loading dialog...');
-      // Show loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
 
-      debugPrint('🔄 [HOME] Initiating call via API...');
-      // Initiate call (userId is always present - required field)
-      final call = await callService.initiateCall(creator.userId);
-      debugPrint('✅ [HOME] Call initiated successfully');
-      debugPrint('   CallId: ${call.callId}');
-      debugPrint('   Channel: ${call.channelName}');
-      debugPrint('   Status: ${call.status.name}');
-
-      // Close loading
-      if (context.mounted) {
-        Navigator.of(context).pop();
-        debugPrint('🔄 [HOME] Loading dialog closed');
-
-        debugPrint('🔄 [HOME] Navigating to video call screen...');
-        // Navigate to video call screen (will poll for token)
-        context.push('/video-call', extra: {
-          'callId': call.callId,
-          'channelName': call.channelName,
-          'token': null, // Will poll for token
-        });
-        debugPrint('✅ [HOME] Navigation complete');
-      }
-    } catch (e, stackTrace) {
-      debugPrint('❌ [HOME] Initiate call error: $e');
-      debugPrint('   Stack: $stackTrace');
-      // Close loading if still open
-      if (context.mounted) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to initiate call: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
+    await initiateVideoCall(
+      context: context,
+      creatorUserId: creator.userId,
+      initiateCallFn: callService.initiateCall,
+    );
   }
 
   Widget _buildUserCard(BuildContext context, UserProfileModel user) {
@@ -365,7 +260,12 @@ class ProfileCard extends StatelessWidget {
                       width: 2,
                     ),
                   ),
-                  child: _buildUserAvatar(user),
+                  child: ClipOval(
+                    child: AvatarWidget(
+                      userProfile: user,
+                      size: 60,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 // Username and Language
@@ -439,44 +339,4 @@ class ProfileCard extends StatelessWidget {
     );
   }
 
-  Widget _buildUserAvatar(UserProfileModel user) {
-    // If user has selected an avatar, use it
-    if (user.avatar != null && user.avatar!.isNotEmpty) {
-      final gender = user.gender ?? 'male';
-      final avatarPath = gender == 'female'
-          ? 'lib/assets/female/${user.avatar}'
-          : 'lib/assets/male/${user.avatar}';
-      
-      return ClipOval(
-        child: Image.asset(
-          avatarPath,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return _buildFallbackAvatar(user);
-          },
-        ),
-      );
-    }
-    
-    // Fallback to network avatar or initials
-    return _buildFallbackAvatar(user);
-  }
-
-  Widget _buildFallbackAvatar(UserProfileModel user) {
-    return Container(
-      color: Colors.purple[400],
-      child: Center(
-        child: Text(
-          (user.username?.isNotEmpty ?? false)
-              ? user.username![0].toUpperCase()
-              : 'U',
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
 }
