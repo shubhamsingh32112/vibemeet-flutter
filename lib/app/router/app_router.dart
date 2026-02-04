@@ -8,12 +8,23 @@ import '../../features/home/screens/home_screen.dart';
 import '../../features/recent/screens/recent_screen.dart';
 import '../../features/account/screens/account_screen.dart';
 import '../../features/account/screens/edit_profile_screen.dart';
-import '../../features/call/screens/video_call_screen.dart';
-import '../../features/call/screens/incoming_call_screen.dart';
 import '../../features/wallet/screens/wallet_screen.dart';
 import '../../features/wallet/screens/transactions_screen.dart';
 import '../../features/creator/screens/creator_tasks_screen.dart';
+import '../../features/chat/screens/chat_screen.dart';
+import '../../features/chat/screens/chat_list_screen.dart';
+import '../../features/video/screens/video_call_screen.dart';
+import 'package:stream_video_flutter/stream_video_flutter.dart';
 
+/// Global GoRouter instance
+/// 
+/// Use this for navigation from anywhere (overlays, lifecycle handlers, Stream callbacks)
+/// Do NOT use BuildContext.push() from outside widget tree - it will fail
+/// 
+/// Example:
+/// ```dart
+/// appRouter.push('/call', extra: call);
+/// ```
 final appRouter = GoRouter(
   initialLocation: '/splash',
   routes: [
@@ -54,6 +65,10 @@ final appRouter = GoRouter(
       path: '/recent',
       builder: (context, state) => const RecentScreen(),
     ),
+    GoRoute(
+      path: '/chat-list',
+      builder: (context, state) => const ChatListScreen(),
+    ),
           GoRoute(
             path: '/account',
             builder: (context, state) => const AccountScreen(),
@@ -79,34 +94,23 @@ final appRouter = GoRouter(
             },
           ),
     GoRoute(
-      path: '/video-call',
+      path: '/chat/:channelId',
       builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>?;
-        if (extra == null) {
+        final channelId = state.pathParameters['channelId'];
+        if (channelId == null) {
           return const Scaffold(
-            body: Center(child: Text('Missing call parameters')),
+            body: Center(child: Text('Missing channel ID')),
           );
         }
-        return VideoCallScreen(
-          callId: extra['callId'] as String,
-          channelName: extra['channelName'] as String,
-          token: extra['token'] as String?,
-          uid: extra['uid'] as int?,
-        );
+        return ChatScreen(channelId: channelId);
       },
     ),
     GoRoute(
-      path: '/incoming-call',
+      path: '/call',
       builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>?;
-        if (extra == null || extra['call'] == null) {
-          return const Scaffold(
-            body: Center(child: Text('Missing call data')),
-          );
-        }
-        return IncomingCallScreen(
-          call: extra['call'] as dynamic,
-        );
+        // 🔥 CRITICAL: VideoCallScreen reads call from StreamVideo.state.activeCall
+        // Router extras are NOT used - Stream state is single source of truth
+        return const VideoCallScreen();
       },
     ),
   ],

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/api/api_client.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../home/providers/home_provider.dart';
 
 enum CreatorStatus {
   online,
@@ -69,6 +70,11 @@ class CreatorStatusNotifier extends StateNotifier<CreatorStatus> {
               'isOnline': status == CreatorStatus.online,
             });
             debugPrint('✅ [CREATOR STATUS] Synced to backend: ${status == CreatorStatus.online ? "online" : "offline"}');
+            
+            // Invalidate creatorsProvider to trigger immediate refetch on user homepages
+            // This ensures users see newly online creators instantly
+            _ref.invalidate(creatorsProvider);
+            debugPrint('🔄 [CREATOR STATUS] Invalidated creatorsProvider to refresh home feed');
           } catch (e) {
             debugPrint('⚠️  [CREATOR STATUS] Failed to sync to backend: $e');
             // Don't fail the status update if backend sync fails

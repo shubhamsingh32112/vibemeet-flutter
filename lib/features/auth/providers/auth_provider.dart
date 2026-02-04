@@ -6,9 +6,8 @@ import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/api/api_client.dart';
-import '../../../core/services/socket_service.dart';
 import '../../../shared/models/user_model.dart';
-import '../../../agora_logic.dart';
+import '../../chat/services/chat_service.dart';
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   return AuthNotifier();
@@ -115,8 +114,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     
     debugPrint('🔐 [AUTH] Setting up auth state listener...');
 
-    // Phase C2: Register coins_updated listener once (single writer for coins)
-    _registerCoinsListenerOnce();
 
     _auth!.authStateChanges().listen((user) async {
       if (user != null) {
@@ -264,31 +261,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('✅ [AUTH] User authenticated and synced successfully');
         debugPrint('   🎉 Ready for app usage');
         
-        // Check and request video permissions if needed (once per login)
+        // Connect to Stream Chat
         try {
-          debugPrint('📋 [AUTH] Checking video permissions...');
-          final hasPermissions = await AgoraLogic.checkAndRequestPermissionsIfNeeded();
-          if (hasPermissions) {
-            debugPrint('✅ [AUTH] Video permissions granted');
-          } else {
-            debugPrint('⚠️  [AUTH] Video permissions not granted - user will be prompted when making a call');
-          }
+          debugPrint('🔌 [AUTH] Connecting to Stream Chat...');
+          final chatService = ChatService();
+          await chatService.getChatToken();
+          
+          // Get Stream Chat notifier from provider (we'll need to pass ref)
+          // For now, we'll handle this in a separate widget that watches auth state
+          debugPrint('✅ [AUTH] Stream Chat token received');
         } catch (e) {
-          debugPrint('⚠️  [AUTH] Permission check error (non-critical): $e');
-          // Don't fail login if permission check fails
+          debugPrint('⚠️  [AUTH] Failed to connect to Stream Chat: $e');
+          // Don't block login if Stream Chat fails
         }
         
-        // Connect to Socket.IO for real-time events
-        try {
-          await SocketService().connect();
-          debugPrint('🔌 [AUTH] Socket.IO connected for real-time events');
-
-          // Phase C2: Ensure coins listener is registered after socket connect
-          _registerCoinsListenerOnce();
-        } catch (e) {
-          debugPrint('⚠️  [AUTH] Failed to connect Socket.IO: $e');
-          // Don't fail login if socket connection fails
-        }
       } else {
         debugPrint('───────────────────────────────────────────────────────');
         debugPrint('❌ [AUTH] Backend sync failed');
@@ -781,13 +767,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('⚠️  [AUTH] Google sign out error (non-critical): $e');
       }
       
-      // Disconnect Socket.IO
-      try {
-        SocketService().disconnect();
-        debugPrint('🔌 [AUTH] Socket.IO disconnected');
-      } catch (e) {
-        debugPrint('⚠️  [AUTH] Socket disconnect error (non-critical): $e');
-      }
       
       debugPrint('🗑️  [AUTH] Clearing local storage...');
       final prefs = await SharedPreferences.getInstance();
@@ -873,47 +852,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Phase C2: Single listener for coins_updated that updates authProvider state.
-  /// This is the ONLY writer for displayed coin balance.
-  void _registerCoinsListenerOnce() {
-    if (_coinsListenerRegistered) return;
-
-    // Listener registration requires socket to be initialized; if not, we'll retry after connect()
-    if (SocketService().socket == null) {
-      return;
-    }
-
-    _coinsListenerRegistered = true;
-    SocketService().onCoinsUpdated((data) async {
-      try {
-        final userId = data['userId'] as String?;
-        final coins = data['coins'];
-
-        final currentUser = state.user;
-        if (currentUser == null) return;
-        if (userId == null) return;
-        if (userId != currentUser.id) return;
-
-        final newCoins = coins is num ? coins.toInt() : int.tryParse(coins?.toString() ?? '');
-        if (newCoins == null) return;
-
-        if (newCoins == currentUser.coins) return;
-
-        debugPrint('🪙 [AUTH] coins_updated applied: ${currentUser.coins} → $newCoins');
-
-        // Update in-memory state (UI authority)
-        state = state.copyWith(
-          user: currentUser.copyWith(coins: newCoins),
-        );
-
-        // Persist (same place login writes)
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setInt(AppConstants.keyUserCoins, newCoins);
-      } catch (e) {
-        debugPrint('⚠️  [AUTH] coins_updated handler error (non-fatal): $e');
-      }
-    });
-  }
 
   Future<void> verifyOtp(String verificationId, String otp) async {
     try {

@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/auth/providers/auth_provider.dart';
-import '../../features/call/widgets/incoming_call_listener.dart';
 import '../../features/creator/providers/creator_status_provider.dart';
 import '../../shared/styles/app_brand_styles.dart';
 import '../../shared/widgets/loading_indicator.dart';
@@ -32,6 +31,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
         context.go('/recent');
         break;
       case 2:
+        context.go('/chat-list');
+        break;
+      case 3:
         context.go('/account');
         break;
     }
@@ -47,10 +49,9 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
     // Show online/offline toggle only for creators on homepage
     final showStatusToggle = isCreator && isHomePage;
 
-    return IncomingCallListener(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
           title: Text(
             AppConstants.appName,
             style: const TextStyle(fontWeight: FontWeight.bold),
@@ -138,13 +139,13 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
             ),
           ],
         ),
-        body: Container(
+      body: Container(
           decoration: const BoxDecoration(
             gradient: AppBrandGradients.appBackground,
           ),
           child: widget.child,
         ),
-        bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: NavigationBar(
           selectedIndex: widget.selectedIndex,
           onDestinationSelected: _onItemTapped,
           destinations: const [
@@ -159,13 +160,17 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
               label: 'Recent',
             ),
             NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline),
+              selectedIcon: Icon(Icons.chat_bubble),
+              label: 'Chat',
+            ),
+            NavigationDestination(
               icon: Icon(Icons.person_outline),
               selectedIcon: Icon(Icons.person),
               label: 'Account',
             ),
           ],
         ),
-      ),
     );
   }
 }

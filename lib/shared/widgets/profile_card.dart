@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/creator_model.dart';
 import '../models/profile_model.dart';
-import '../../features/call/services/call_service.dart';
-import '../../features/call/utils/call_helper.dart';
 import 'avatar_widget.dart';
 
 class ProfileCard extends StatelessWidget {
@@ -180,46 +178,11 @@ class ProfileCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Video Call Button with Price
-                Flexible(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _initiateVideoCall(context, creator),
-                    icon: const Icon(Icons.videocam, size: 18),
-                    label: Text('${creator.price.toInt()} coins/min'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             ),
           ],
         ),
       ),
-    );
-  }
-
-  // Initiate video call
-  Future<void> _initiateVideoCall(BuildContext context, CreatorModel creator) async {
-    debugPrint('📞 [HOME] User tapped video call button');
-    debugPrint('   Creator: ${creator.name}');
-    debugPrint('   Creator ID: ${creator.id}');
-    debugPrint('   Creator User ID: ${creator.userId}');
-
-    final callService = CallService();
-
-    await initiateVideoCall(
-      context: context,
-      creatorUserId: creator.userId,
-      initiateCallFn: callService.initiateCall,
     );
   }
 

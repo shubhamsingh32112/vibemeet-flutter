@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'app/router/app_router.dart';
 import 'app/widgets/app_lifecycle_wrapper.dart';
+import 'app/widgets/stream_chat_wrapper.dart';
 import 'core/theme/app_theme.dart';
+import 'features/chat/providers/stream_chat_provider.dart';
+import 'features/video/widgets/incoming_call_listener.dart';
 
 bool _firebaseInitialized = false;
 
@@ -37,13 +42,53 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppLifecycleWrapper(
+    return StreamChatWrapper(
       child: MaterialApp.router(
         title: 'Eazy Talks',
         theme: AppTheme.darkTheme,
         routerConfig: appRouter,
         debugShowCheckedModeBanner: false,
+        // Localizations configuration (required by StreamChat)
+        supportedLocales: const [Locale('en')],
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        // CRITICAL: All widgets that use Navigator/GoRouter/Material widgets MUST be inside MaterialApp
+        // This ensures Directionality, Navigator, Theme, and MediaQuery are available
+        // Order: StreamChat → AppLifecycleWrapper → IncomingCallListener → router child
+        builder: (context, child) {
+          return _StreamChatBuilder(
+            child: AppLifecycleWrapper(
+              child: IncomingCallListener(
+                child: child ?? const SizedBox.shrink(),
+              ),
+            ),
+          );
+        },
       ),
+    );
+  }
+}
+
+/// Helper widget to build StreamChat inside MaterialApp (where Localizations is available)
+class _StreamChatBuilder extends ConsumerWidget {
+  final Widget? child;
+
+  const _StreamChatBuilder({this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streamClient = ref.watch(streamChatNotifierProvider);
+    
+    // CRITICAL: Always wrap with StreamChat widget
+    // Client is initialized immediately in provider, so it's always available
+    // This ensures StreamChat is in the widget tree for ALL routes (including ChatScreen)
+    // AND it's inside MaterialApp so Localizations is available
+    return StreamChat(
+      client: streamClient!,
+      child: child ?? const SizedBox.shrink(),
     );
   }
 }

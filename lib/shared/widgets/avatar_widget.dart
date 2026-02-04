@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/user_model.dart';
 import '../models/creator_model.dart';
 import '../models/profile_model.dart';
-import '../models/call_model.dart';
 
 /// A reusable avatar widget that handles:
-/// - Creator photos (URLs from CreatorModel.photo or CreatorInfo.avatar)
+/// - Creator photos (URLs from CreatorModel.photo)
 /// - User avatars (premade assets from UserModel.avatar)
 /// - Creator avatars in UserModel (URLs when role='creator')
 /// - Fallback to initials
@@ -22,11 +21,6 @@ class AvatarWidget extends StatelessWidget {
   /// User profile model (for user avatars in profile context)
   final UserProfileModel? userProfile;
   
-  /// Creator info from call model (for creator photos in calls)
-  final CreatorInfo? creatorInfo;
-  
-  /// Caller info from call model (for caller avatars in calls)
-  final CallerInfo? callerInfo;
   
   /// Direct avatar string (for cases where we just have the avatar string)
   /// Can be a URL (http/https/data:) or a premade avatar filename
@@ -56,8 +50,6 @@ class AvatarWidget extends StatelessWidget {
     this.user,
     this.creator,
     this.userProfile,
-    this.creatorInfo,
-    this.callerInfo,
     this.avatar,
     this.username,
     this.name,
@@ -77,23 +69,7 @@ class AvatarWidget extends StatelessWidget {
       );
     }
 
-    // Priority 2: Creator photo from CreatorInfo (call context)
-    if (creatorInfo != null && creatorInfo!.avatar != null && creatorInfo!.avatar!.isNotEmpty) {
-      final avatarStr = creatorInfo!.avatar!;
-      // Check if it's a URL
-      if (avatarStr.startsWith('http://') ||
-          avatarStr.startsWith('https://') ||
-          avatarStr.startsWith('data:')) {
-        return _buildNetworkAvatar(
-          url: avatarStr,
-          fallbackText: creatorInfo!.username?.isNotEmpty == true
-              ? creatorInfo!.username![0].toUpperCase()
-              : 'C',
-        );
-      }
-    }
-
-    // Priority 3: User avatar from UserModel (check if it's a URL for creators)
+    // Priority 2: User avatar from UserModel (check if it's a URL for creators)
     if (user != null && user!.avatar != null && user!.avatar!.isNotEmpty) {
       final avatarStr = user!.avatar!;
       // If user is a creator/admin and avatar is a URL, use it as network image
@@ -115,7 +91,7 @@ class AvatarWidget extends StatelessWidget {
       );
     }
 
-    // Priority 4: User avatar from UserProfileModel
+    // Priority 3: User avatar from UserProfileModel
     if (userProfile != null &&
         userProfile!.avatar != null &&
         userProfile!.avatar!.isNotEmpty) {
@@ -138,30 +114,7 @@ class AvatarWidget extends StatelessWidget {
       );
     }
 
-    // Priority 5: Caller avatar from CallerInfo
-    if (callerInfo != null &&
-        callerInfo!.avatar != null &&
-        callerInfo!.avatar!.isNotEmpty) {
-      final avatarStr = callerInfo!.avatar!;
-      // Check if it's a URL
-      if (avatarStr.startsWith('http://') ||
-          avatarStr.startsWith('https://') ||
-          avatarStr.startsWith('data:')) {
-        return _buildNetworkAvatar(
-          url: avatarStr,
-          fallbackText: callerInfo!.username?.isNotEmpty == true
-              ? callerInfo!.username![0].toUpperCase()
-              : 'U',
-        );
-      }
-      // Otherwise, treat as premade avatar
-      return _buildAssetAvatar(
-        avatar: avatarStr,
-        gender: gender ?? 'male',
-      );
-    }
-
-    // Priority 6: Direct avatar string
+    // Priority 4: Direct avatar string
     if (avatar != null && avatar!.isNotEmpty) {
       final avatarStr = avatar!;
       // Check if it's a URL
@@ -277,12 +230,6 @@ class AvatarWidget extends StatelessWidget {
     }
     if (creator?.name != null && creator!.name.isNotEmpty) {
       return creator!.name[0].toUpperCase();
-    }
-    if (creatorInfo?.username != null && creatorInfo!.username!.isNotEmpty) {
-      return creatorInfo!.username![0].toUpperCase();
-    }
-    if (callerInfo?.username != null && callerInfo!.username!.isNotEmpty) {
-      return callerInfo!.username![0].toUpperCase();
     }
     // Default fallback
     return '?';

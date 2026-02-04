@@ -20,7 +20,9 @@ class AppConstants {
   static const String keyUserPhone = 'user_phone';
   static const String keyUserCoins = 'user_coins';
   
-  // Agora Configuration
-  // TODO: Replace with your Agora App ID from Agora Console
-  static const String agoraAppId = 'e356cca3a60448f1b3dd91baa93dfa40';
+  // Stream Chat Configuration
+  // TODO: Get this from your Stream Dashboard (should match STREAM_API_KEY in backend .env)
+  // This is the public API key (safe to expose in client)
+  static const String streamApiKey = 'd536t7g4q75v';
 }
+

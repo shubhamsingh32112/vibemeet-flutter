@@ -2,7 +2,8 @@ import 'package:equatable/equatable.dart';
 
 class CreatorModel extends Equatable {
   final String id;
-  final String userId; // User ID for initiating calls (REQUIRED - creator always has a user)
+  final String userId; // MongoDB User ID (REQUIRED - creator always has a user)
+  final String? firebaseUid; // Firebase UID for Stream Video calls (null if not available)
   final String name;
   final String about;
   final String photo;
@@ -16,6 +17,7 @@ class CreatorModel extends Equatable {
   const CreatorModel({
     required this.id,
     required this.userId,
+    this.firebaseUid,
     required this.name,
     required this.about,
     required this.photo,
@@ -31,6 +33,7 @@ class CreatorModel extends Equatable {
     return CreatorModel(
       id: json['id'] as String,
       userId: json['userId'] as String, // Required - no fallback
+      firebaseUid: json['firebaseUid'] as String?,
       name: json['name'] as String,
       about: json['about'] as String,
       photo: json['photo'] as String,
@@ -53,6 +56,7 @@ class CreatorModel extends Equatable {
     return {
       'id': id,
       'userId': userId,
+      'firebaseUid': firebaseUid,
       'name': name,
       'about': about,
       'photo': photo,
@@ -69,6 +73,7 @@ class CreatorModel extends Equatable {
   List<Object?> get props => [
         id,
         userId,
+        firebaseUid,
         name,
         about,
         photo,

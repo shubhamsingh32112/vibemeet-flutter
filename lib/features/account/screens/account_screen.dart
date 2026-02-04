@@ -92,8 +92,8 @@ class _AccountScreenState extends ConsumerState<AccountScreen> {
     final user = authState.user;
     final scheme = Theme.of(context).colorScheme;
 
-    return MainLayout(
-      selectedIndex: 3,
+        return MainLayout(
+          selectedIndex: 3,
       child: authState.isLoading && user == null
           ? const Center(child: LoadingIndicator())
           : SingleChildScrollView(

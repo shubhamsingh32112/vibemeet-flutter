@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_spacing.dart';
-import '../../call/widgets/incoming_call_listener.dart';
+import '../../../app/widgets/main_layout.dart';
 import '../../../shared/widgets/skeleton_card.dart';
 import '../../../shared/widgets/welcome_dialog.dart';
 import '../../../shared/widgets/ui_primitives.dart';
@@ -12,14 +12,15 @@ import '../../../shared/styles/app_brand_styles.dart';
 import '../../../shared/models/creator_model.dart';
 import '../../../shared/models/profile_model.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../../../core/services/socket_service.dart';
 import '../../../core/services/welcome_service.dart';
+import '../../../core/services/permission_prompt_service.dart';
 import '../providers/home_provider.dart';
 import '../widgets/home_user_grid_card.dart';
 import '../../creator/providers/creator_task_provider.dart';
 import '../../creator/models/creator_task_model.dart';
 import '../../wallet/providers/earnings_provider.dart';
 import '../../creator/providers/creator_status_provider.dart';
+import '../../video/services/permission_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -29,16 +30,18 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  bool _listenerSetup = false;
   bool _welcomeDialogShown = false;
 
   @override
   void initState() {
     super.initState();
-    // Listen to creator status changes for real-time updates
-    _setupSocketListener();
     // Check and show welcome dialog if needed
     _checkAndShowWelcomeDialog();
+    // Check and request video permissions for users
+    _checkAndRequestVideoPermissions();
+    // Set up Stream event listener for creator status changes (replaces polling)
+    // This is done by watching the provider, which sets up the listener
+    ref.read(creatorStatusEventListenerProvider);
   }
 
   Future<void> _checkAndShowWelcomeDialog() async {
@@ -77,39 +80,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _setupSocketListener() {
-    if (_listenerSetup) return;
+  /// Check and request video permissions for users
+  /// Only shows dialog once (persisted across sessions) if permissions are not granted
+  /// 
+  /// 🔥 CRITICAL: Uses persistent flag to prevent showing on every rebuild
+  /// Prevents dialog spam on hot reloads, theme changes, navigation back, etc.
+  Future<void> _checkAndRequestVideoPermissions() async {
+    // Wait for auth state to be available
+    await Future.delayed(const Duration(milliseconds: 500));
     
-    // Only listen if user is not a creator (creators see users, not creators)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final authState = ref.read(authProvider);
-      final user = authState.user;
-      
-      // Only users (not creators) need to listen to creator status changes
-      if (user != null && user.role != 'creator' && user.role != 'admin') {
-        final socketService = SocketService();
-        
-        // Wait a bit for socket to connect if needed
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (!mounted) return;
-          
-          socketService.onCreatorStatusChanged((data) {
-            debugPrint('🔄 [HOME] Creator status changed, refreshing list...');
-            debugPrint('   Creator: ${data['name']} is now ${data['isOnline'] ? 'online' : 'offline'}');
-            
-            // Invalidate the providers to refresh the list
-            if (mounted) {
-              ref.invalidate(homeFeedProvider);
-              // Also invalidate creatorsProvider directly
-              ref.invalidate(creatorsProvider);
-            }
-          });
-          
-          _listenerSetup = true;
-        });
-      }
-    });
+    if (!mounted) return;
+    
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+    
+    // Only request permissions for regular users (they can make video calls)
+    if (user == null || user.role != 'user') {
+      return;
+    }
+    
+    // Check if permissions are already granted
+    final hasPermissions = await PermissionService.hasCameraAndMicrophonePermissions();
+    if (hasPermissions) {
+      debugPrint('✅ [HOME] Camera and microphone permissions already granted');
+      return;
+    }
+    
+    // 🔥 CRITICAL: Check persistent flag (not session flag)
+    // This prevents showing dialog on every rebuild/hot reload/navigation
+    final hasShownPrompt = await PermissionPromptService.hasShownPermissionPrompt();
+    if (hasShownPrompt) {
+      debugPrint('⏭️  [HOME] Permission prompt already shown (persisted)');
+      return;
+    }
+    
+    // Wait a bit more for UI to stabilize
+    await Future.delayed(const Duration(milliseconds: 1000));
+    
+    if (!mounted) return;
+    
+    // Mark as shown BEFORE showing dialog (prevents race conditions)
+    await PermissionPromptService.markPermissionPromptAsShown();
+    _showVideoPermissionDialog();
   }
+
+  /// Show dialog requesting video permissions
+  void _showVideoPermissionDialog() {
+    final scheme = Theme.of(context).colorScheme;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.videocam, color: scheme.primary),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Enable Video Calls'),
+            ),
+          ],
+        ),
+        content: const Text(
+          'To make video calls with creators, we need access to your camera and microphone. '
+          'You can enable these permissions in your device settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+            },
+            child: const Text('Not Now'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              
+              try {
+                final granted = await PermissionService.ensureCameraAndMicrophonePermissions();
+                if (granted && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Permissions granted! You can now make video calls.'),
+                      backgroundColor: scheme.primaryContainer,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                } else if (mounted) {
+                  // Permissions denied - show message about settings
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text(
+                        'Permissions are required for video calls. Please enable them in app settings.',
+                      ),
+                      backgroundColor: scheme.errorContainer,
+                      duration: const Duration(seconds: 4),
+                      action: SnackBarAction(
+                        label: 'Settings',
+                        textColor: scheme.onErrorContainer,
+                        onPressed: () async {
+                          // Open app settings so user can enable permissions manually
+                          await PermissionService.openAppSettings();
+                        },
+                      ),
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: ${e.toString()}'),
+                      backgroundColor: scheme.errorContainer,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text('Enable'),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -120,43 +214,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final isRegularUser = user?.role == 'user';
     final scheme = Theme.of(context).colorScheme;
 
-    return IncomingCallListener(
-      child: AppScaffold(
-        padded: true,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: 0,
-          onDestinationSelected: (index) {
-            switch (index) {
-              case 0:
-                context.go('/home');
-                break;
-              case 1:
-                context.go('/recent');
-                break;
-              case 2:
-                context.go('/account');
-                break;
-            }
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.history_outlined),
-              selectedIcon: Icon(Icons.history),
-              label: 'Recent',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Account',
-            ),
-          ],
-        ),
-        child: isCreator
+    return MainLayout(
+        selectedIndex: 0,
+        child: AppScaffold(
+          padded: true,
+          child: isCreator
             ? _CreatorTasksView()
             : homeFeedAsync.when(
           data: (items) {
