@@ -10,6 +10,7 @@ class UserModel extends Equatable {
   final List<String>? categories;
   final int usernameChangeCount;
   final int coins;
+  final bool welcomeBonusClaimed;
   final String? role; // 'user', 'creator', or 'admin'
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -24,6 +25,7 @@ class UserModel extends Equatable {
     this.categories,
     this.usernameChangeCount = 0,
     required this.coins,
+    this.welcomeBonusClaimed = false,
     this.role,
     this.createdAt,
     this.updatedAt,
@@ -42,6 +44,7 @@ class UserModel extends Equatable {
           : null,
       usernameChangeCount: json['usernameChangeCount'] as int? ?? 0,
       coins: json['coins'] as int? ?? 0,
+      welcomeBonusClaimed: json['welcomeBonusClaimed'] as bool? ?? false,
       role: json['role'] as String?,
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
@@ -63,6 +66,7 @@ class UserModel extends Equatable {
       'categories': categories,
       'usernameChangeCount': usernameChangeCount,
       'coins': coins,
+      'welcomeBonusClaimed': welcomeBonusClaimed,
       'role': role,
       'createdAt': createdAt?.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
@@ -79,6 +83,7 @@ class UserModel extends Equatable {
     List<String>? categories,
     int? usernameChangeCount,
     int? coins,
+    bool? welcomeBonusClaimed,
     String? role,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -93,6 +98,7 @@ class UserModel extends Equatable {
       categories: categories ?? this.categories,
       usernameChangeCount: usernameChangeCount ?? this.usernameChangeCount,
       coins: coins ?? this.coins,
+      welcomeBonusClaimed: welcomeBonusClaimed ?? this.welcomeBonusClaimed,
       role: role ?? this.role,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -110,6 +116,7 @@ class UserModel extends Equatable {
         categories,
         usernameChangeCount,
         coins,
+        welcomeBonusClaimed,
         role,
         createdAt,
         updatedAt,

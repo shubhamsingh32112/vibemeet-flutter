@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_spacing.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/models/creator_model.dart';
@@ -7,11 +8,10 @@ import '../../../shared/styles/app_brand_styles.dart';
 import '../../../shared/widgets/ui_primitives.dart';
 import '../../auth/providers/auth_provider.dart';
 import '../../../core/api/api_client.dart';
+import '../../chat/services/chat_service.dart';
 import '../providers/home_provider.dart';
-import '../../video/services/call_service.dart';
-import '../../video/providers/stream_video_provider.dart';
-import '../../video/services/call_navigation_service.dart';
-import '../../video/services/permission_service.dart';
+import '../providers/availability_provider.dart';
+import '../../video/controllers/call_connection_controller.dart';
 
 class HomeUserGridCard extends ConsumerStatefulWidget {
   final CreatorModel? creator;
@@ -29,94 +29,80 @@ class HomeUserGridCard extends ConsumerStatefulWidget {
 
 class _HomeUserGridCardState extends ConsumerState<HomeUserGridCard> {
   bool _isInitiatingCall = false;
+  bool _isOpeningChat = false;
 
+  /// Open a chat channel with the creator.
+  Future<void> _openChat() async {
+    if (widget.creator == null || _isOpeningChat) return;
+
+    final creatorFirebaseUid = widget.creator!.firebaseUid;
+    if (creatorFirebaseUid == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Creator information not available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _isOpeningChat = true);
+
+    try {
+      final chatService = ChatService();
+      final result = await chatService.createOrGetChannel(creatorFirebaseUid);
+      final channelId = result['channelId'] as String?;
+
+      if (channelId != null && mounted) {
+        context.push('/chat/$channelId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open chat: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isOpeningChat = false);
+    }
+  }
+
+  /// Initiate a video call to the creator via [CallConnectionController].
+  ///
+  /// All call logic (permissions, getOrCreate, join, navigation) is
+  /// handled by the controller — the card only triggers it.
   Future<void> _initiateVideoCall() async {
-    if (widget.creator == null) return;
-    if (_isInitiatingCall) return;
+    if (widget.creator == null || _isInitiatingCall) return;
+
+    final creatorFirebaseUid = widget.creator!.firebaseUid;
+    if (creatorFirebaseUid == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Creator information not available'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isInitiatingCall = true;
     });
 
     try {
-      final callService = ref.read(callServiceProvider);
-      final streamVideo = ref.read(streamVideoProvider);
-
-      if (streamVideo == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Video service not available. Please try again later.'),
-              backgroundColor: Colors.red,
-            ),
+      await ref
+          .read(callConnectionControllerProvider.notifier)
+          .startUserCall(
+            creatorFirebaseUid: creatorFirebaseUid,
+            creatorMongoId: widget.creator!.id,
           );
-        }
-        return;
-      }
-
-      // Get current user's Firebase UID
-      final authState = ref.read(authProvider);
-      final firebaseUser = authState.firebaseUser;
-      if (firebaseUser == null) {
-        throw Exception('User not authenticated');
-      }
-
-      // Get creator's Firebase UID (required for Stream Video calls)
-      final creatorFirebaseUid = widget.creator!.firebaseUid;
-      if (creatorFirebaseUid == null) {
-        throw Exception('Creator Firebase UID not available');
-      }
-      
-      // 🔥 CRITICAL: Request camera and microphone permissions BEFORE starting call
-      // Stream SDK does NOT auto-request permissions
-      // Must be done BEFORE getOrCreate() / join()
-      // video: true because this is a video call
-      final hasPermissions = await PermissionService.ensurePermissions(video: true);
-      if (!hasPermissions) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Camera and microphone permissions are required for video calls'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-      
-      // Initiate call using SDK (not REST)
-      // This replaces the old REST-based approach - calls are now created entirely via SDK
-      final call = await callService.initiateCall(
-        creatorFirebaseUid: creatorFirebaseUid,
-        currentUserFirebaseUid: firebaseUser.uid,
-        creatorMongoId: widget.creator!.id,
-        streamVideo: streamVideo,
-      );
-
-      // 🔥 CRITICAL FIX: Navigate IMMEDIATELY after call creation (BEFORE join)
-      // Stream Video call flow: create call → show UI → join() in background
-      // join() blocks waiting for callee to accept - don't block UI thread
-      // The call screen will handle the join state and show appropriate UI
-      CallNavigationService.navigateToCall(call);
-      
-      // Join the call in background (non-blocking)
-      // This allows UI to show immediately while waiting for callee to accept
-      callService.joinCall(call).then((_) {
-        debugPrint('✅ [HOME CARD] Join completed successfully');
-      }).catchError((error) {
-        debugPrint('❌ [HOME CARD] Error joining call: $error');
-        // Error is handled by call screen - user can see the failure state
-      });
-    } catch (e) {
-      debugPrint('❌ [HOME CARD] Error initiating call: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to start video call: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     } finally {
       if (mounted) {
         setState(() {
@@ -128,6 +114,24 @@ class _HomeUserGridCardState extends ConsumerState<HomeUserGridCard> {
 
   @override
   Widget build(BuildContext context) {
+    // Listen for call connection failures to show error SnackBars.
+    // Only this card reacts (guarded by _isInitiatingCall).
+    ref.listen<CallConnectionState>(callConnectionControllerProvider,
+        (prev, next) {
+      if (_isInitiatingCall &&
+          next.phase == CallConnectionPhase.failed &&
+          next.error != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(next.error!),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    });
+
     final scheme = Theme.of(context).colorScheme;
 
     final String title = widget.creator?.name ?? widget.user?.username ?? 'User';
@@ -135,6 +139,14 @@ class _HomeUserGridCardState extends ConsumerState<HomeUserGridCard> {
     final isRegularUser = authState.user?.role == 'user';
     final showFavorite = isRegularUser && widget.creator != null;
     final showVideoCall = isRegularUser && widget.creator != null;
+
+    // ── Availability (only relevant for creator cards) ────────────────────
+    final availabilityMap = ref.watch(creatorAvailabilityProvider);
+    final creatorAvailability = widget.creator?.firebaseUid != null
+        ? (availabilityMap[widget.creator!.firebaseUid!] ??
+            CreatorAvailability.busy)
+        : CreatorAvailability.busy;
+    final isCreatorOnline = creatorAvailability == CreatorAvailability.online;
 
     return AppCard(
       padding: EdgeInsets.zero,
@@ -151,6 +163,13 @@ class _HomeUserGridCardState extends ConsumerState<HomeUserGridCard> {
                 ),
               ),
             ),
+            // ── Availability tag (top-left) ────────────────────────────────
+            if (widget.creator != null)
+              Positioned(
+                top: AppSpacing.sm,
+                left: AppSpacing.sm,
+                child: _AvailabilityTag(isOnline: isCreatorOnline),
+              ),
             if (showFavorite)
               Positioned(
                 top: AppSpacing.md,
@@ -186,9 +205,16 @@ class _HomeUserGridCardState extends ConsumerState<HomeUserGridCard> {
                   ),
                   if (showVideoCall) ...[
                     const SizedBox(width: AppSpacing.sm),
+                    _ChatActionButton(
+                      isLoading: _isOpeningChat,
+                      onPressed: _openChat,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
                     _VideoCallButton(
                       isLoading: _isInitiatingCall,
-                      onPressed: _initiateVideoCall,
+                      // Only allow calling if creator is online
+                      onPressed: isCreatorOnline ? _initiateVideoCall : null,
+                      disabled: !isCreatorOnline,
                     ),
                   ],
                 ],
@@ -207,23 +233,70 @@ class _HomeUserGridCardState extends ConsumerState<HomeUserGridCard> {
   }
 }
 
-class _VideoCallButton extends StatelessWidget {
+class _ChatActionButton extends StatelessWidget {
   final bool isLoading;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
 
-  const _VideoCallButton({
+  const _ChatActionButton({
     required this.isLoading,
-    required this.onPressed,
+    this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
     return Material(
-      color: scheme.primary.withValues(alpha: 0.9),
+      color: scheme.surfaceContainerHigh.withValues(alpha: 0.85),
       borderRadius: BorderRadius.circular(999),
       child: InkWell(
         onTap: isLoading ? null : onPressed,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm),
+          child: isLoading
+              ? SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(scheme.primary),
+                  ),
+                )
+              : Icon(
+                  Icons.chat_bubble_outline,
+                  color: scheme.primary,
+                  size: 20,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoCallButton extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback? onPressed;
+  final bool disabled;
+
+  const _VideoCallButton({
+    required this.isLoading,
+    this.onPressed,
+    this.disabled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final effectiveDisabled = disabled || onPressed == null;
+
+    return Material(
+      color: effectiveDisabled
+          ? scheme.surfaceContainerHigh.withValues(alpha: 0.6)
+          : scheme.primary.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: isLoading || effectiveDisabled ? null : onPressed,
         borderRadius: BorderRadius.circular(999),
         child: Padding(
           padding: const EdgeInsets.all(AppSpacing.sm),
@@ -238,10 +311,54 @@ class _VideoCallButton extends StatelessWidget {
                 )
               : Icon(
                   Icons.videocam,
-                  color: scheme.onPrimary,
+                  color: effectiveDisabled
+                      ? scheme.onSurface.withValues(alpha: 0.4)
+                      : scheme.onPrimary,
                   size: 20,
                 ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Availability tag (Online / Busy) ──────────────────────────────────────
+class _AvailabilityTag extends StatelessWidget {
+  final bool isOnline;
+
+  const _AvailabilityTag({required this.isOnline});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isOnline
+            ? Colors.green.withValues(alpha: 0.9)
+            : Colors.orange.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isOnline ? 'Online' : 'Busy',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

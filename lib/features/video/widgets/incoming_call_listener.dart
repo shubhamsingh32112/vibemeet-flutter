@@ -3,15 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
+import '../controllers/call_connection_controller.dart';
 import '../providers/stream_video_provider.dart';
 import 'incoming_call_widget.dart';
 
-/// Widget that listens for incoming calls and shows UI when call arrives
-/// 
-/// Should be placed high in the widget tree (e.g., in main app scaffold)
-/// 
-/// CRITICAL: Listens for CallRingingEvent to detect incoming calls
-/// Stream Video does NOT auto-show incoming calls - you must explicitly listen
+/// Widget that listens for incoming calls and shows UI when call arrives.
+///
+/// Should be placed high in the widget tree (e.g., in main app scaffold).
+///
+/// CRITICAL: Listens for CallRingingEvent to detect incoming calls.
+/// Stream Video does NOT auto-show incoming calls — you must explicitly listen.
+///
+/// Overlay dismissal:
+///   - Hidden when [CallConnectionController] is actively handling a call.
+///   - Hidden when the caller cancels (SDK clears `state.incomingCall`).
+///   - Hidden when the creator rejects the call.
+///   - Calls that have been handled (accepted/rejected) are tracked by ID
+///     and never re-shown — this prevents stale `valueOrNull` from
+///     resurrecting the overlay after a call ends.
 class IncomingCallListener extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -21,14 +30,18 @@ class IncomingCallListener extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<IncomingCallListener> createState() => _IncomingCallListenerState();
+  ConsumerState<IncomingCallListener> createState() =>
+      _IncomingCallListenerState();
 }
 
 class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
   Call? _incomingCall;
   StreamSubscription? _ringingSubscription;
   StreamSubscription? _incomingCallSubscription;
-  StreamSubscription? _callStateSubscription;
+
+  /// Call IDs that have already been handled (accepted, rejected, or ended).
+  /// Prevents the overlay from re-appearing due to stale SDK state.
+  final Set<String> _handledCallIds = {};
 
   @override
   void initState() {
@@ -42,7 +55,8 @@ class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
   void _setupIncomingCallListener() {
     final streamVideo = ref.read(streamVideoProvider);
     if (streamVideo == null) {
-      debugPrint('⏳ [INCOMING CALL] Stream Video not initialized yet, will retry on next build');
+      debugPrint(
+          '⏳ [INCOMING CALL] Stream Video not initialized yet, will retry on next build');
       return;
     }
 
@@ -52,23 +66,30 @@ class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
 
     debugPrint('📞 [INCOMING CALL] Setting up incoming call listener');
 
-    // Method 1: Listen for CoordinatorCallRingingEvent via events stream
-    // This fires when a call starts ringing
-    // CRITICAL: Without this listener, incoming calls are received but never shown
+    // Method 1: Listen for CoordinatorCallRingingEvent via events stream.
+    // This fires when a call starts ringing.
+    // CRITICAL: Without this listener, incoming calls are received but never shown.
     _ringingSubscription = streamVideo.events.listen((event) {
       if (event is CoordinatorCallRingingEvent) {
         debugPrint('📞 [INCOMING CALL] CoordinatorCallRingingEvent received');
         debugPrint('   Call CID: ${event.callCid}');
-        debugPrint('   Call Type: ${event.callCid.type}, ID: ${event.callCid.id}');
+        debugPrint(
+            '   Call Type: ${event.callCid.type}, ID: ${event.callCid.id}');
         debugPrint('   Video: ${event.video}');
-        
-        // Get the call object using makeCall (this retrieves existing call)
-        // We use defaultType() since all our calls use 'default' type
+
+        // Skip calls we've already handled
+        if (_handledCallIds.contains(event.callCid.id)) {
+          debugPrint(
+              '⏭️ [INCOMING CALL] Ignoring already-handled call: ${event.callCid.id}');
+          return;
+        }
+
+        // Get the call object using makeCall (retrieves existing call).
         final call = streamVideo.makeCall(
           callType: StreamCallType.defaultType(),
           id: event.callCid.id,
         );
-        
+
         debugPrint('✅ [INCOMING CALL] Call object retrieved: ${call.id}');
         if (mounted) {
           setState(() {
@@ -78,40 +99,27 @@ class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
       }
     });
 
-    // Method 2: Also listen to state.incomingCall (recommended - simpler approach)
-    // This is a StateEmitter that updates when incoming call changes
-    // This automatically provides the Call object when a call is ringing
-    _incomingCallSubscription = streamVideo.state.incomingCall.listen((call) {
-      // Cancel previous call state subscription if any
-      _callStateSubscription?.cancel();
-      
+    // Method 2: Also listen to state.incomingCall (recommended — simpler).
+    // Automatically provides the Call object when a call is ringing.
+    // Also handles caller-cancellation: SDK emits null when caller hangs up.
+    _incomingCallSubscription =
+        streamVideo.state.incomingCall.listen((call) {
       if (call != null) {
-        debugPrint('📞 [INCOMING CALL] Incoming call detected via state: ${call.id}');
+        // Skip calls we've already handled
+        if (_handledCallIds.contains(call.id)) {
+          debugPrint(
+              '⏭️ [INCOMING CALL] Ignoring already-handled call via state: ${call.id}');
+          return;
+        }
+        debugPrint(
+            '📞 [INCOMING CALL] Incoming call detected via state: ${call.id}');
         if (mounted) {
           setState(() {
             _incomingCall = call;
           });
         }
-        
-        // 🔥 CRITICAL FIX: Listen to call state changes to clear incoming call overlay
-        // When call is joined/connected, clear the incoming call state
-        // This ensures the overlay disappears when call is accepted
-        _callStateSubscription = call.state.listen((callState) {
-          final status = callState.status;
-          if (status.isJoined || status.isConnected) {
-            debugPrint('✅ [INCOMING CALL] Call joined/connected - clearing incoming call overlay');
-            if (mounted) {
-              setState(() {
-                _incomingCall = null;
-              });
-            }
-            // Cancel subscription once call is joined (no longer incoming)
-            _callStateSubscription?.cancel();
-            _callStateSubscription = null;
-          }
-        });
       } else {
-        debugPrint('📞 [INCOMING CALL] Incoming call cleared');
+        debugPrint('📞 [INCOMING CALL] Incoming call cleared by SDK');
         if (mounted) {
           setState(() {
             _incomingCall = null;
@@ -121,6 +129,19 @@ class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
     });
 
     debugPrint('✅ [INCOMING CALL] Listener set up successfully');
+  }
+
+  /// Explicitly dismiss the incoming call overlay and mark the call as handled.
+  ///
+  /// Called when the creator rejects the call or when the caller cancels.
+  void _dismissIncomingCall(String callId) {
+    debugPrint('🚫 [INCOMING CALL] Dismissing call: $callId');
+    _handledCallIds.add(callId);
+    if (mounted) {
+      setState(() {
+        _incomingCall = null;
+      });
+    }
   }
 
   @override
@@ -137,15 +158,14 @@ class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
   void dispose() {
     _ringingSubscription?.cancel();
     _incomingCallSubscription?.cancel();
-    _callStateSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Watch Stream Video provider - set up listener when it becomes available
+    // Watch Stream Video provider — set up listener when it becomes available
     final streamVideo = ref.watch(streamVideoProvider);
-    
+
     // Set up listener if Stream Video is available but listener isn't set up yet
     if (streamVideo != null && _ringingSubscription == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -154,43 +174,55 @@ class _IncomingCallListenerState extends ConsumerState<IncomingCallListener> {
         }
       });
     }
-    
-    // Also check state.incomingCall as fallback (in case event listener missed it)
-    // CRITICAL: Use valueOrNull instead of .value - ValueStream doesn't always have a value
-    // Accessing .value when hasValue == false causes runtime exception
-    final stateIncomingCall = streamVideo?.state.incomingCall.valueOrNull;
-    
-    // Use either the event-based call or the state-based call
-    final incomingCall = _incomingCall ?? stateIncomingCall;
 
-    // 🔥 CRITICAL FIX: Only show overlay if call is actually incoming (ringing)
-    // If call is already joined/connected, don't show overlay (it was accepted)
-    if (incomingCall != null) {
-      // Check call state - if already joined/connected, don't show overlay
-      final callState = incomingCall.state.valueOrNull;
-      final status = callState?.status;
-      if (status != null && (status.isJoined || status.isConnected)) {
-        // Call is already joined - clear incoming call state and don't show overlay
-        if (_incomingCall != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() {
-                _incomingCall = null;
-              });
-            }
-          });
-        }
-        return widget.child;
+    // ── Controller-aware overlay dismissal ──────────────────────────────────
+    //
+    // When the controller is actively handling a call (preparing / joining /
+    // connected / disconnecting), the incoming-call overlay must NOT show.
+    final controllerPhase =
+        ref.watch(callConnectionControllerProvider).phase;
+    final controllerActive =
+        controllerPhase != CallConnectionPhase.idle &&
+            controllerPhase != CallConnectionPhase.failed;
+
+    // When the controller starts working on a call, mark it as handled
+    // so the overlay never re-appears for this call ID.
+    ref.listen<CallConnectionState>(callConnectionControllerProvider,
+        (prev, next) {
+      if (next.phase != CallConnectionPhase.idle &&
+          next.phase != CallConnectionPhase.failed &&
+          _incomingCall != null) {
+        _handledCallIds.add(_incomingCall!.id);
+        setState(() {
+          _incomingCall = null;
+        });
       }
-      
-      // Call is still ringing - show overlay
+    });
+
+    // If controller is active, hide overlay immediately.
+    if (controllerActive) {
+      return widget.child;
+    }
+
+    // ── Determine whether an incoming call overlay should show ──────────────
+
+    // Only use _incomingCall (set by event/state subscriptions).
+    // Do NOT fall back to valueOrNull — it can return stale call objects
+    // after a call has ended, causing the overlay to re-appear.
+    final incomingCall = _incomingCall;
+
+    if (incomingCall != null && !_handledCallIds.contains(incomingCall.id)) {
+      // Call is still ringing — show overlay
       return Stack(
         children: [
           widget.child,
           // Full-screen overlay for incoming call
           Material(
             color: Colors.black54,
-            child: IncomingCallWidget(incomingCall: incomingCall),
+            child: IncomingCallWidget(
+              incomingCall: incomingCall,
+              onDismiss: () => _dismissIncomingCall(incomingCall.id),
+            ),
           ),
         ],
       );

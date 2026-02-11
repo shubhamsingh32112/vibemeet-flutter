@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/auth/providers/auth_provider.dart';
+import '../../features/creator/providers/creator_dashboard_provider.dart';
 import '../../features/creator/providers/creator_status_provider.dart';
+import '../../features/recent/providers/recent_provider.dart';
+import '../../features/video/providers/call_billing_provider.dart';
 import '../../shared/styles/app_brand_styles.dart';
 import '../../shared/widgets/loading_indicator.dart';
 
@@ -42,9 +45,30 @@ class _MainLayoutState extends ConsumerState<MainLayout> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
-    final coins = authState.user?.coins ?? 0;
+    final billingState = ref.watch(callBillingProvider);
     final isCreator = authState.user?.role == 'creator' || authState.user?.role == 'admin';
     final isHomePage = widget.selectedIndex == 0;
+
+    // During an active call, show live Redis coins; otherwise show MongoDB coins
+    final coins = billingState.isActive && !isCreator
+        ? billingState.userCoins
+        : (authState.user?.coins ?? 0);
+
+    // Refresh user data + call history when billing settles
+    ref.listen<CallBillingState>(callBillingProvider, (prev, next) {
+      if (prev?.settled != true && next.settled) {
+        ref.read(authProvider.notifier).refreshUser();
+        ref.invalidate(recentCallsProvider); // Refresh recent calls list
+        // Also refresh creator dashboard if user is a creator
+        if (isCreator) {
+          ref.invalidate(creatorDashboardProvider);
+        }
+        // Reset billing state after a short delay
+        Future.delayed(const Duration(seconds: 2), () {
+          ref.read(callBillingProvider.notifier).reset();
+        });
+      }
+    });
     
     // Show online/offline toggle only for creators on homepage
     final showStatusToggle = isCreator && isHomePage;

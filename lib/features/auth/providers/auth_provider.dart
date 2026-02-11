@@ -215,6 +215,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 : null,
             usernameChangeCount: creatorData['usernameChangeCount'] as int? ?? 0,
             coins: creatorData['coins'] as int? ?? 0,
+            welcomeBonusClaimed: creatorData['welcomeBonusClaimed'] as bool? ?? false,
             role: creatorData['role'] as String? ?? 'creator',
             createdAt: creatorData['createdAt'] != null
                 ? DateTime.parse(creatorData['createdAt'] as String)
@@ -827,6 +828,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
                 : null,
             usernameChangeCount: responseData['usernameChangeCount'] as int? ?? 0,
             coins: responseData['coins'] as int? ?? 0,
+            welcomeBonusClaimed: responseData['welcomeBonusClaimed'] as bool? ?? false,
             role: responseData['role'] as String? ?? 'creator',
             createdAt: responseData['createdAt'] != null
                 ? DateTime.parse(responseData['createdAt'] as String)

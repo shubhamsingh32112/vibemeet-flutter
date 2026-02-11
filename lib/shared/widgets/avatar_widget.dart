@@ -69,14 +69,14 @@ class AvatarWidget extends StatelessWidget {
       );
     }
 
-    // Priority 2: User avatar from UserModel (check if it's a URL for creators)
+    // Priority 2: User avatar from UserModel
     if (user != null && user!.avatar != null && user!.avatar!.isNotEmpty) {
       final avatarStr = user!.avatar!;
-      // If user is a creator/admin and avatar is a URL, use it as network image
-      if ((user!.role == 'creator' || user!.role == 'admin') &&
-          (avatarStr.startsWith('http://') ||
-              avatarStr.startsWith('https://') ||
-              avatarStr.startsWith('data:'))) {
+      // If avatar is a URL (Firebase Storage, etc.), use it as network image
+      // This works for all roles – regular users, creators, and admins
+      if (avatarStr.startsWith('http://') ||
+          avatarStr.startsWith('https://') ||
+          avatarStr.startsWith('data:')) {
         return _buildNetworkAvatar(
           url: avatarStr,
           fallbackText: user!.username?.isNotEmpty == true
@@ -84,7 +84,7 @@ class AvatarWidget extends StatelessWidget {
               : 'U',
         );
       }
-      // Otherwise, treat as premade avatar
+      // Otherwise, treat as premade avatar filename (legacy)
       return _buildAssetAvatar(
         avatar: avatarStr,
         gender: user!.gender ?? gender ?? 'male',

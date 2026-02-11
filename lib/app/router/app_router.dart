@@ -14,7 +14,6 @@ import '../../features/creator/screens/creator_tasks_screen.dart';
 import '../../features/chat/screens/chat_screen.dart';
 import '../../features/chat/screens/chat_list_screen.dart';
 import '../../features/video/screens/video_call_screen.dart';
-import 'package:stream_video_flutter/stream_video_flutter.dart';
 
 /// Global GoRouter instance
 /// 
@@ -108,8 +107,8 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/call',
       builder: (context, state) {
-        // 🔥 CRITICAL: VideoCallScreen reads call from StreamVideo.state.activeCall
-        // Router extras are NOT used - Stream state is single source of truth
+        // VideoCallScreen is a pure renderer driven by CallConnectionController.
+        // Navigation here is triggered ONLY after phase == connected.
         return const VideoCallScreen();
       },
     ),

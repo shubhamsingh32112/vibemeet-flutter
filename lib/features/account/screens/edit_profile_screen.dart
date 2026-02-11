@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/services/avatar_upload_service.dart';
 import '../../../shared/widgets/ui_primitives.dart';
 import '../../../shared/styles/app_brand_styles.dart';
 import '../../auth/providers/auth_provider.dart';
@@ -34,6 +35,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     'Relationship',
   ];
 
+  /// Whether the user picked a *new* local avatar (different from what was saved).
+  bool _avatarChanged = false;
+
   @override
   void initState() {
     super.initState();
@@ -42,9 +46,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     
     if (user != null) {
       _usernameController.text = user.username ?? user.id.substring(0, 9);
-      _selectedAvatar = user.avatar;
       if (user.categories != null) {
         _selectedCategories.addAll(user.categories!);
+      }
+
+      // If the stored avatar is a URL (Firebase Storage), we can't match it
+      // to a local filename – default to the first avatar in the carousel.
+      final storedAvatar = user.avatar;
+      if (storedAvatar != null &&
+          !storedAvatar.startsWith('http://') &&
+          !storedAvatar.startsWith('https://') &&
+          availableAvatars.contains(storedAvatar)) {
+        _selectedAvatar = storedAvatar;
+      } else {
+        _selectedAvatar = availableAvatars.isNotEmpty ? availableAvatars[0] : null;
       }
     }
     
@@ -141,17 +156,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       debugPrint('🔄 [EDIT PROFILE] Saving profile...');
       debugPrint('   Username: $username');
       debugPrint('   Avatar: $_selectedAvatar');
+      debugPrint('   Avatar changed: $_avatarChanged');
       debugPrint('   Categories: ${_selectedCategories.toList()}');
 
       // For creators, don't send avatar (it's managed in admin dashboard)
       final user = ref.read(authProvider).user;
       final isCreator = user?.role == 'creator' || user?.role == 'admin';
+      final authState = ref.read(authProvider);
+      
+      // If the user picked a new local avatar, upload it to Firebase Storage
+      String? avatarValue;
+      if (!isCreator && _selectedAvatar != null && _avatarChanged) {
+        final firebaseUid = authState.firebaseUser?.uid;
+        if (firebaseUid != null) {
+          debugPrint('🖼️  [EDIT PROFILE] Uploading new avatar to Firebase Storage...');
+          avatarValue = await AvatarUploadService.uploadAvatar(
+            firebaseUid: firebaseUid,
+            avatarName: _selectedAvatar!,
+            gender: user?.gender ?? 'male',
+          );
+          debugPrint('✅ [EDIT PROFILE] Avatar uploaded: $avatarValue');
+        }
+      }
       
       final response = await _apiClient.put(
         '/user/profile',
         data: {
           'username': username,
-          if (!isCreator) 'avatar': _selectedAvatar, // Only send avatar for non-creators
+          if (!isCreator && avatarValue != null) 'avatar': avatarValue,
           'categories': _selectedCategories.toList(),
         },
       );
@@ -278,6 +310,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                             onPageChanged: (index) {
                               setState(() {
                                 _selectedAvatar = availableAvatars[index];
+                                _avatarChanged = true;
                               });
                             },
                             itemCount: availableAvatars.length,
@@ -294,6 +327,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                   );
                                   setState(() {
                                     _selectedAvatar = avatar;
+                                    _avatarChanged = true;
                                   });
                                 },
                                 child: AnimatedContainer(

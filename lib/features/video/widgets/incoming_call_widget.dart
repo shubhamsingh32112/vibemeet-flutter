@@ -2,24 +2,34 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:stream_video_flutter/stream_video_flutter.dart';
-import '../services/call_navigation_service.dart';
-import '../services/permission_service.dart';
+import '../controllers/call_connection_controller.dart';
 
-/// Widget to display incoming call notification
-/// 
-/// Shows when StreamVideo.instance.state.incomingCall is not null
-/// Provides Accept and Reject buttons
+/// Widget to display incoming call notification.
+///
+/// Shows Accept / Reject buttons when idle.
+/// Shows "Connecting…" spinner when the controller is preparing / joining.
+///
+/// ❌ Does NOT navigate or join — delegates entirely to [CallConnectionController].
 class IncomingCallWidget extends ConsumerWidget {
   final Call incomingCall;
+
+  /// Called when the call is dismissed (rejected by creator or cancelled by caller).
+  /// The parent [IncomingCallListener] uses this to mark the call ID as handled
+  /// and prevent the overlay from re-appearing.
+  final VoidCallback? onDismiss;
 
   const IncomingCallWidget({
     super.key,
     required this.incomingCall,
+    this.onDismiss,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
+    final callPhase = ref.watch(callConnectionControllerProvider).phase;
+    final isProcessing = callPhase == CallConnectionPhase.preparing ||
+        callPhase == CallConnectionPhase.joining;
 
     return Container(
       color: scheme.surface,
@@ -41,7 +51,7 @@ class IncomingCallWidget extends ConsumerWidget {
               ),
               const SizedBox(height: 24),
               Text(
-                'Incoming Call',
+                isProcessing ? 'Connecting…' : 'Incoming Call',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -54,85 +64,42 @@ class IncomingCallWidget extends ConsumerWidget {
                     ),
               ),
               const Spacer(),
-              // Action buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Reject button
-                  _CallActionButton(
-                    icon: Icons.call_end,
-                    label: 'Reject',
-                    color: Colors.red,
-                    onPressed: () async {
-                      try {
-                        // Call reject() to properly reject the incoming call
-                        await incomingCall.reject();
-                        debugPrint('❌ [CALL] Call rejected by creator');
-                      } catch (e) {
-                        debugPrint('❌ [CALL] Error rejecting call: $e');
-                      }
-                    },
-                  ),
-                  // Accept button
-                  _CallActionButton(
-                    icon: Icons.call,
-                    label: 'Accept',
-                    color: Colors.green,
-                    onPressed: () async {
-                      try {
-                        // 🔥 CRITICAL: Request permissions ONLY when user taps Accept
-                        // Do NOT request permissions before Accept - Android can background app
-                        // during permission dialog, which kills the ringing overlay
-                        // 
-                        // Strict order: permissions → accept → navigate → join
-                        final hasPermissions = await PermissionService.ensurePermissions(video: true);
-                        if (!hasPermissions) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Camera and microphone permissions are required for video calls'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                          // No permissions → no accept → no side effects
-                          return;
+              // Action buttons or connecting spinner
+              if (isProcessing)
+                const CircularProgressIndicator()
+              else
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    // Reject button
+                    _CallActionButton(
+                      icon: Icons.call_end,
+                      label: 'Reject',
+                      color: Colors.red,
+                      onPressed: () async {
+                        try {
+                          await incomingCall.reject();
+                          debugPrint('❌ [CALL] Call rejected by creator');
+                        } catch (e) {
+                          debugPrint('❌ [CALL] Error rejecting call: $e');
                         }
-                        
-                        // CRITICAL: Must call accept() AFTER permissions are granted
-                        // This tells Stream that the call was accepted
-                        await incomingCall.accept();
-                        debugPrint('✅ [CALL] Call accepted');
-                        
-                        // 🔥 CRITICAL FIX: Navigate IMMEDIATELY after accept (BEFORE join)
-                        // Navigate first so UI appears immediately
-                        // join() will happen in background - call screen will handle state
-                        CallNavigationService.navigateToCall(incomingCall);
-                        
-                        // Join the call in background (non-blocking)
-                        // This allows UI to show immediately while connecting
-                        incomingCall.join().then((_) {
-                          debugPrint('✅ [CALL] Join completed successfully');
-                        }).catchError((error) {
-                          debugPrint('❌ [CALL] Error joining call: $error');
-                          // Error is handled by call screen - user can see the failure state
-                        });
-                        debugPrint('✅ [CALL] Join initiated in background');
-                      } catch (e) {
-                        debugPrint('❌ [CALL] Error accepting call: $e');
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to accept call: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-                    },
-                  ),
-                ],
-              ),
+                        // Dismiss overlay immediately so it doesn't linger
+                        onDismiss?.call();
+                      },
+                    ),
+                    // Accept button — delegates to controller
+                    _CallActionButton(
+                      icon: Icons.call,
+                      label: 'Accept',
+                      color: Colors.green,
+                      onPressed: () {
+                        ref
+                            .read(callConnectionControllerProvider.notifier)
+                            .acceptIncomingCall(incomingCall);
+                      },
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

@@ -3,10 +3,13 @@ class AppConstants {
   
   // Backend API Base URL
   // For USB debugging on physical device, use your desktop's local IP address
-  // Current detected IP: 192.168.1.11
-  // To find your IP: ipconfig (Windows) or ifconfig (Mac/Linux)
-  // Look for "IPv4 Address" under your active network adapter
-  static const String baseUrl = 'http://192.168.1.11:3000/api/v1';
+  // For USB debugging with ADB reverse tunnel: use localhost
+  // Run: .\setup-adb-tunnels.ps1  (sets up adb reverse tcp:3000 tcp:3000)
+  // Fallback IP (WiFi): 192.168.1.5
+  static const String baseUrl = 'http://localhost:3000/api/v1';
+  
+  // Socket.IO URL (same host as REST API, no /api/v1 suffix)
+  static const String socketUrl = 'http://localhost:3000';
   
   // Alternative configurations:
   // For Android emulator: 'http://10.0.2.2:3000/api/v1'

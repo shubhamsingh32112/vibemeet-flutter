@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../features/auth/providers/auth_provider.dart';
 import '../../features/chat/providers/stream_chat_provider.dart';
 import '../../features/chat/services/chat_service.dart';
@@ -53,6 +54,12 @@ class _StreamChatWrapperState extends ConsumerState<StreamChatWrapper> {
           );
 
       debugPrint('✅ [STREAM WRAPPER] Stream Chat connected');
+
+      // Register FCM device for push notifications
+      final currentClient = ref.read(streamChatNotifierProvider);
+      if (currentClient != null) {
+        await PushNotificationService().initialize(currentClient);
+      }
     } catch (e) {
       debugPrint('❌ [STREAM WRAPPER] Failed to connect to Stream Chat: $e');
       // Don't block app if Stream Chat fails
@@ -98,6 +105,9 @@ class _StreamChatWrapperState extends ConsumerState<StreamChatWrapper> {
 
       // If user logged out, disconnect Stream Chat and Stream Video
       if (!next.isAuthenticated) {
+        // Remove FCM device from Stream before disconnecting
+        PushNotificationService().dispose();
+
         final currentClient = ref.read(streamChatNotifierProvider);
         if (currentClient?.state.currentUser != null) {
           ref.read(streamChatNotifierProvider.notifier).disconnectUser();

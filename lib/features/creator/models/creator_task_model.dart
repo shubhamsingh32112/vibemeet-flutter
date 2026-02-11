@@ -15,9 +15,12 @@ class CreatorTasksResponse extends Equatable {
       return 0.0;
     }
 
+    // Accept either 'tasks' (standalone endpoint) or 'items' (dashboard endpoint)
+    final tasksList = (json['tasks'] ?? json['items']) as List<dynamic>;
+
     return CreatorTasksResponse(
       totalMinutes: _toDouble(json['totalMinutes']),
-      tasks: (json['tasks'] as List<dynamic>)
+      tasks: tasksList
           .map((task) => CreatorTask.fromJson(task as Map<String, dynamic>))
           .toList(),
     );

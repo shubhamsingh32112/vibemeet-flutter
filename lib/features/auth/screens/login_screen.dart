@@ -56,23 +56,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     debugPrint('   ⏰ Timestamp: ${DateTime.now().toIso8601String()}');
     debugPrint('   📱 Screen: Login Screen');
     debugPrint('   🔘 Action: Phone Sign In');
-    
-    if (_phoneController.text.isEmpty) {
-      debugPrint('───────────────────────────────────────────────────────');
-      debugPrint('⚠️  [UI] Validation failed');
-      debugPrint('───────────────────────────────────────────────────────');
+
+    final digits = _phoneController.text.trim();
+
+    if (digits.isEmpty) {
       debugPrint('   ❌ Phone number field is empty');
-      debugPrint('   💡 User must enter a phone number');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter your phone number')),
       );
       return;
     }
-    
+
+    if (digits.length != 10 || !RegExp(r'^\d{10}$').hasMatch(digits)) {
+      debugPrint('   ❌ Invalid phone number length: ${digits.length}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid 10-digit mobile number')),
+      );
+      return;
+    }
+
     if (!_acceptTerms) {
-      debugPrint('───────────────────────────────────────────────────────');
-      debugPrint('⚠️  [UI] Validation failed');
-      debugPrint('───────────────────────────────────────────────────────');
       debugPrint('   ❌ Terms and conditions not accepted');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please accept the terms and conditions')),
@@ -80,12 +83,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
 
-    final phoneNumber = _phoneController.text.trim();
+    // Prepend +91 country code
+    final phoneNumber = '+91$digits';
     debugPrint('───────────────────────────────────────────────────────');
     debugPrint('📱 [UI] Phone number entered');
     debugPrint('───────────────────────────────────────────────────────');
     debugPrint('   📞 Phone: $phoneNumber');
-    debugPrint('   📏 Length: ${phoneNumber.length} characters');
+    debugPrint('   📏 Digits: ${digits.length}');
     debugPrint('   🔄 Calling signInWithPhone()...');
 
     final startTime = DateTime.now();
@@ -190,8 +194,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               TextField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
+                maxLength: 10,
+                decoration: InputDecoration(
                   labelText: 'Mobile Number',
+                  prefixIcon: Padding(
+                    padding: const EdgeInsets.only(left: 12, right: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '+91',
+                          style: textTheme.bodyLarge?.copyWith(
+                            color: scheme.onSurface,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 1,
+                          height: 24,
+                          color: scheme.outlineVariant,
+                        ),
+                      ],
+                    ),
+                  ),
+                  counterText: '', // hide the "0/10" counter
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),

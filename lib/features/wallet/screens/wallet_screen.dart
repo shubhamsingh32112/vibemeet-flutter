@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../auth/providers/auth_provider.dart';
-import '../services/earnings_service.dart';
+import '../../creator/providers/creator_dashboard_provider.dart';
 import '../services/wallet_service.dart';
 import '../models/earnings_model.dart';
 import '../../../shared/widgets/loading_indicator.dart';
@@ -17,11 +17,7 @@ class WalletScreen extends ConsumerStatefulWidget {
 }
 
 class _WalletScreenState extends ConsumerState<WalletScreen> {
-  final EarningsService _earningsService = EarningsService();
   final WalletService _walletService = WalletService();
-  CreatorEarnings? _earnings;
-  bool _isLoadingEarnings = false;
-  String? _earningsError;
   bool _isAddingCoins = false;
 
   @override
@@ -31,11 +27,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshUserData();
     });
-    
-    final user = ref.read(authProvider).user;
-    if (user?.role == 'creator' || user?.role == 'admin') {
-      _loadEarnings();
-    }
   }
 
   /// Refresh user data from backend to get latest coin balance
@@ -46,31 +37,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       debugPrint('✅ [WALLET] User data refreshed');
     } catch (e) {
       debugPrint('⚠️  [WALLET] Failed to refresh user data: $e');
-      // Don't show error to user - balance will update eventually
-    }
-  }
-
-  Future<void> _loadEarnings() async {
-    setState(() {
-      _isLoadingEarnings = true;
-      _earningsError = null;
-    });
-
-    try {
-      final earnings = await _earningsService.getCreatorEarnings();
-      if (mounted) {
-        setState(() {
-          _earnings = earnings;
-          _isLoadingEarnings = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _earningsError = e.toString();
-          _isLoadingEarnings = false;
-        });
-      }
     }
   }
 
@@ -80,6 +46,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final user = authState.user;
     final coins = user?.coins ?? 0;
     final isCreator = user?.role == 'creator' || user?.role == 'admin';
+
+    // Watch the dashboard provider for creator earnings (auto-refreshes via socket)
+    final earningsAsync = isCreator ? ref.watch(dashboardEarningsProvider) : null;
 
     return AppScaffold(
       padded: false,
@@ -109,18 +78,36 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 ),
               ),
               if (isCreator)
-                _CreatorWalletView(
-                  earnings: _earnings,
-                  isLoadingEarnings: _isLoadingEarnings,
-                  earningsError: _earningsError,
-                  onRefresh: () async {
-                    await _refreshUserData();
-                    if (mounted) {
-                      await _loadEarnings();
-                    }
-                  },
-                  onRetry: _loadEarnings,
-                  buildCallEarningCard: _buildCallEarningCard,
+                earningsAsync!.when(
+                  data: (earnings) => _CreatorWalletView(
+                    earnings: earnings,
+                    isLoadingEarnings: false,
+                    earningsError: null,
+                    onRefresh: () async {
+                      await _refreshUserData();
+                      ref.invalidate(creatorDashboardProvider);
+                    },
+                    onRetry: () => ref.invalidate(creatorDashboardProvider),
+                    buildCallEarningCard: _buildCallEarningCard,
+                  ),
+                  loading: () => _CreatorWalletView(
+                    earnings: null,
+                    isLoadingEarnings: true,
+                    earningsError: null,
+                    onRefresh: () async {},
+                    onRetry: () {},
+                    buildCallEarningCard: _buildCallEarningCard,
+                  ),
+                  error: (error, _) => _CreatorWalletView(
+                    earnings: null,
+                    isLoadingEarnings: false,
+                    earningsError: error.toString(),
+                    onRefresh: () async {
+                      ref.invalidate(creatorDashboardProvider);
+                    },
+                    onRetry: () => ref.invalidate(creatorDashboardProvider),
+                    buildCallEarningCard: _buildCallEarningCard,
+                  ),
                 )
               else
                 _UserWalletView(

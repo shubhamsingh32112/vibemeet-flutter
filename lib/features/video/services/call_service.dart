@@ -31,9 +31,15 @@ class CallService {
     try {
       debugPrint('📞 [CALL] Initiating call to creator: $creatorFirebaseUid');
 
-      // Generate deterministic call ID (matches backend format: userId_creatorId)
-      // This ensures idempotency - calling the same creator again reuses the call
-      final callId = '${currentUserFirebaseUid}_$creatorMongoId';
+      // Generate a unique call ID per attempt.
+      // Appending a timestamp ensures that each call creates a fresh session
+      // in Stream Video. Without this, getOrCreate would return the stale
+      // (ended/disconnected) call object from a previous session, preventing
+      // the user from ever calling the same creator again.
+      // NOTE: Stream Video enforces a 64-char max on call IDs.
+      //   Firebase UID (28) + '_' + Mongo ID (24) + '_' + seconds (10) = 63 chars.
+      final ts = DateTime.now().millisecondsSinceEpoch ~/ 1000; // seconds
+      final callId = '${currentUserFirebaseUid}_${creatorMongoId}_$ts';
 
       debugPrint('📞 [CALL] Call ID: $callId');
 

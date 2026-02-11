@@ -6,7 +6,9 @@ import '../../../core/constants/app_spacing.dart';
 import '../../../app/widgets/main_layout.dart';
 import '../../../shared/widgets/skeleton_card.dart';
 import '../../../shared/widgets/welcome_dialog.dart';
+import '../../../shared/widgets/welcome_bonus_dialog.dart';
 import '../../../shared/widgets/ui_primitives.dart';
+import '../../wallet/services/wallet_service.dart';
 import '../../../shared/widgets/loading_indicator.dart';
 import '../../../shared/styles/app_brand_styles.dart';
 import '../../../shared/models/creator_model.dart';
@@ -15,10 +17,11 @@ import '../../auth/providers/auth_provider.dart';
 import '../../../core/services/welcome_service.dart';
 import '../../../core/services/permission_prompt_service.dart';
 import '../providers/home_provider.dart';
+import '../providers/availability_provider.dart';
 import '../widgets/home_user_grid_card.dart';
+import '../../creator/providers/creator_dashboard_provider.dart';
 import '../../creator/providers/creator_task_provider.dart';
 import '../../creator/models/creator_task_model.dart';
-import '../../wallet/providers/earnings_provider.dart';
 import '../../creator/providers/creator_status_provider.dart';
 import '../../video/services/permission_service.dart';
 
@@ -39,9 +42,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _checkAndShowWelcomeDialog();
     // Check and request video permissions for users
     _checkAndRequestVideoPermissions();
-    // Set up Stream event listener for creator status changes (replaces polling)
-    // This is done by watching the provider, which sets up the listener
-    ref.read(creatorStatusEventListenerProvider);
+    // Connect Socket.IO and hydrate creator availability from Redis
+    _initSocketAndHydrateAvailability();
+  }
+
+  /// Connect to Socket.IO, then hydrate availability once creators are loaded.
+  ///
+  /// Sequence:
+  ///   1. Get Firebase token
+  ///   2. Connect socket (auth handshake)
+  ///   3. Wait for creatorsProvider to resolve
+  ///   4. Emit availability:get with all creator firebaseUids
+  ///   5. Socket service auto-re-requests on reconnect
+  Future<void> _initSocketAndHydrateAvailability() async {
+    // Give the widget tree a moment to settle
+    await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
+
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated || authState.firebaseUser == null) return;
+
+    // Get a fresh Firebase ID token for the socket auth handshake
+    final token = await authState.firebaseUser!.getIdToken();
+    if (token == null || !mounted) return;
+
+    // Connect socket (no-op if already connected)
+    final socketService = ref.read(socketServiceProvider);
+    socketService.connect(token);
+
+    // Wait for the REST creators list to arrive, then request availability
+    try {
+      final creators = await ref.read(creatorsProvider.future);
+      if (!mounted) return;
+
+      final creatorFirebaseUids = creators
+          .where((c) => c.firebaseUid != null)
+          .map((c) => c.firebaseUid!)
+          .toList();
+
+      if (creatorFirebaseUids.isNotEmpty) {
+        socketService.requestAvailability(creatorFirebaseUids);
+      }
+    } catch (e) {
+      debugPrint('❌ [HOME] Failed to hydrate availability: $e');
+    }
   }
 
   Future<void> _checkAndShowWelcomeDialog() async {
@@ -61,6 +105,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!hasSeen && !_welcomeDialogShown && context.mounted) {
       _welcomeDialogShown = true;
       _showWelcomeDialog();
+    } else {
+      // Welcome dialog already seen — check for bonus
+      _checkAndShowBonusDialog();
     }
   }
 
@@ -75,7 +122,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (context.mounted) {
             Navigator.of(context).pop();
           }
+          // After welcome dialog dismissed, check for bonus
+          _checkAndShowBonusDialog();
         },
+      ),
+    );
+  }
+
+  /// Show the 30-coin welcome bonus dialog if:
+  ///   1. User is a regular user (not creator/admin)
+  ///   2. User hasn't already claimed the bonus (backend flag)
+  ///   3. The dialog hasn't already been shown on this device (local flag)
+  ///
+  /// The local flag ensures that even if the user dismisses with "No thanks",
+  /// the popup never appears again.
+  Future<void> _checkAndShowBonusDialog() async {
+    if (!mounted) return;
+    final authState = ref.read(authProvider);
+    final user = authState.user;
+
+    // Only for regular users who haven't claimed
+    if (user == null || user.role != 'user' || user.welcomeBonusClaimed) {
+      return;
+    }
+
+    // Check local persistent flag — once shown, never show again
+    final firebaseUid = authState.firebaseUser?.uid;
+    if (firebaseUid == null) return;
+
+    final alreadyShown = await WelcomeService.hasBonusDialogBeenShown(firebaseUid);
+    if (alreadyShown) return;
+
+    // Mark as shown BEFORE displaying (prevents race conditions on fast rebuilds)
+    await WelcomeService.markBonusDialogShown(firebaseUid);
+
+    // Small delay to let the UI settle after the welcome dialog
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      _showBonusDialog();
+    });
+  }
+
+  bool _isBonusClaiming = false;
+
+  void _showBonusDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => WelcomeBonusDialog(
+          isLoading: _isBonusClaiming,
+          onAccept: () async {
+            setDialogState(() => _isBonusClaiming = true);
+            try {
+              final walletService = WalletService();
+              final newCoins = await walletService.claimWelcomeBonus();
+              // Update auth state with new coins + claimed flag
+              if (mounted) {
+                ref.read(authProvider.notifier).refreshUser();
+              }
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('🎉 You received 30 coins! Balance: $newCoins'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
+            } catch (e) {
+              if (ctx.mounted) {
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to claim bonus: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            } finally {
+              _isBonusClaiming = false;
+            }
+          },
+          onDecline: () {
+            Navigator.of(ctx).pop();
+          },
+        ),
       ),
     );
   }
@@ -225,8 +357,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (items.isEmpty) {
             return EmptyState(
               icon: isCreator ? Icons.people_outline : Icons.person_outline,
-              title: isCreator ? 'No users available' : 'No online creators available',
-              message: isCreator ? 'Users will appear here when they join' : 'Creators will appear here when they go online',
+              title: isCreator ? 'No users available' : 'No creators available',
+              message: isCreator ? 'Users will appear here when they join' : 'Creators will appear here when they join',
             );
           }
 
@@ -358,8 +490,9 @@ class _CreatorTasksViewState extends ConsumerState<_CreatorTasksView> {
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final coins = authState.user?.coins ?? 0;
-    final tasksAsync = ref.watch(creatorTasksProvider);
-    final earningsAsync = ref.watch(creatorEarningsProvider);
+    // Use dashboard-derived providers (auto-synced via creator:data_updated socket event)
+    final tasksAsync = ref.watch(dashboardTasksProvider);
+    final earningsAsync = ref.watch(dashboardEarningsProvider);
     final scheme = Theme.of(context).colorScheme;
 
     return Column(
@@ -470,7 +603,7 @@ class _CreatorTasksViewState extends ConsumerState<_CreatorTasksView> {
               title: 'Failed to load tasks',
               message: error.toString(),
               actionLabel: 'Retry',
-              onAction: () => ref.refresh(creatorTasksProvider),
+              onAction: () => ref.invalidate(creatorDashboardProvider),
             ),
           ),
         ),
@@ -482,8 +615,8 @@ class _CreatorTasksViewState extends ConsumerState<_CreatorTasksView> {
     try {
       await ref.read(creatorTaskServiceProvider).claimTaskReward(taskKey);
       
-      // Optimistically update the provider
-      ref.invalidate(creatorTasksProvider);
+      // Invalidate dashboard to refresh all creator data (earnings + tasks + coins)
+      ref.invalidate(creatorDashboardProvider);
       
       if (mounted) {
         final scheme = Theme.of(context).colorScheme;

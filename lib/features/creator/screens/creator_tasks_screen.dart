@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../providers/creator_dashboard_provider.dart';
 import '../providers/creator_task_provider.dart';
 import '../models/creator_task_model.dart';
 import '../../../shared/widgets/ui_primitives.dart';
@@ -32,7 +33,8 @@ class _CreatorTasksScreenState extends ConsumerState<CreatorTasksScreen> {
     }
     
     final coins = user?.coins ?? 0;
-    final tasksAsync = ref.watch(creatorTasksProvider);
+    // Use dashboard-derived tasks provider (auto-synced via socket)
+    final tasksAsync = ref.watch(dashboardTasksProvider);
 
     return AppScaffold(
       padded: false,
@@ -83,7 +85,7 @@ class _CreatorTasksScreenState extends ConsumerState<CreatorTasksScreen> {
               loading: () => const Center(child: LoadingIndicator()),
               error: (error, stack) => _ErrorView(
                 error: error.toString(),
-                onRetry: () => ref.refresh(creatorTasksProvider),
+                onRetry: () => ref.invalidate(creatorDashboardProvider),
               ),
             ),
           ),
@@ -102,8 +104,9 @@ class _CreatorTasksScreenState extends ConsumerState<CreatorTasksScreen> {
     try {
       await ref.read(creatorTaskServiceProvider).claimTaskReward(taskKey);
       
-      // Invalidate provider to refresh task state (mark as claimed)
-      ref.invalidate(creatorTasksProvider);
+      // Invalidate dashboard to refresh task state (mark as claimed)
+      // The backend also emits creator:data_updated, but invalidate immediately for responsiveness
+      ref.invalidate(creatorDashboardProvider);
       
       // Remove from claiming set
       if (mounted) {

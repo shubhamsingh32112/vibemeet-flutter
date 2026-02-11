@@ -1,16 +1,18 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:stream_chat_flutter/stream_chat_flutter.dart';
 import 'app/router/app_router.dart';
 import 'app/widgets/app_lifecycle_wrapper.dart';
 import 'app/widgets/stream_chat_wrapper.dart';
+import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/chat/providers/stream_chat_provider.dart';
 import 'features/video/widgets/incoming_call_listener.dart';
-
-bool _firebaseInitialized = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,15 +22,55 @@ void main() async {
   // Run: flutterfire configure
   try {
     await Firebase.initializeApp();
-    _firebaseInitialized = true;
     debugPrint('✅ Firebase initialized successfully');
   } catch (e) {
     debugPrint('❌ Firebase initialization error: $e');
     debugPrint('⚠️  Please run: flutterfire configure');
     debugPrint('⚠️  App will continue but authentication will not work');
-    _firebaseInitialized = false;
     // Continue anyway - will show error in UI
   }
+
+  // ─── Initialize local notifications plugin ONCE, globally, early ───
+  final localNotifications = FlutterLocalNotificationsPlugin();
+
+  const androidSettings =
+      AndroidInitializationSettings('@mipmap/ic_launcher');
+  const iosSettings = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+  const initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
+  );
+
+  await localNotifications.initialize(
+    initSettings,
+    onDidReceiveNotificationResponse: onLocalNotificationTap,
+  );
+
+  // Create the Android notification channel
+  if (Platform.isAndroid) {
+    const channel = AndroidNotificationChannel(
+      'chat_messages',
+      'Chat Messages',
+      description: 'Notifications for new chat messages',
+      importance: Importance.high,
+    );
+    await localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
+
+  debugPrint('✅ Local notifications plugin initialized globally');
+
+  // Inject the single instance into PushNotificationService
+  PushNotificationService().setNotificationsPlugin(localNotifications);
+
+  // Register FCM background message handler (must be top-level function)
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   
   runApp(
     const ProviderScope(

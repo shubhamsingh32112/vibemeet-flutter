@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../../app/widgets/main_layout.dart';
 import '../../../shared/widgets/skeleton_list.dart';
+import '../../chat/services/chat_service.dart';
+import '../models/call_history_model.dart';
 import '../providers/recent_provider.dart';
 
 class RecentScreen extends ConsumerStatefulWidget {
@@ -13,11 +17,9 @@ class RecentScreen extends ConsumerStatefulWidget {
 
 class _RecentScreenState extends ConsumerState<RecentScreen> {
   Future<void> _refresh() async {
-    // Force a re-fetch
     ref.invalidate(recentCallsProvider);
     await ref.read(recentCallsProvider.future);
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +37,8 @@ class _RecentScreenState extends ConsumerState<RecentScreen> {
               children: [
                 const Icon(Icons.error_outline, size: 48),
                 const SizedBox(height: 12),
-                Text('Failed to load recent activity', style: Theme.of(context).textTheme.titleMedium),
+                Text('Failed to load recent calls',
+                    style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Text(err.toString(), textAlign: TextAlign.center),
                 const SizedBox(height: 16),
@@ -48,31 +51,198 @@ class _RecentScreenState extends ConsumerState<RecentScreen> {
           ),
         ),
         data: (calls) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No recent activity',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.grey[600],
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Your recent activity will appear here',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey[500],
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+          if (calls.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No recent calls',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.grey[600],
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Your call history will appear here',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.grey[500],
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: calls.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, indent: 76, endIndent: 16),
+              itemBuilder: (context, index) {
+                final call = calls[index];
+                return _CallHistoryTile(call: call);
+              },
             ),
           );
         },
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Single call history tile
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _CallHistoryTile extends StatelessWidget {
+  final CallHistoryModel call;
+  const _CallHistoryTile({required this.call});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isOutgoing = call.isOutgoing;
+    final timeAgo = _formatTimeAgo(call.createdAt);
+
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundColor: scheme.primaryContainer,
+        backgroundImage:
+            call.otherAvatar != null ? NetworkImage(call.otherAvatar!) : null,
+        child: call.otherAvatar == null
+            ? Icon(Icons.person, color: scheme.onPrimaryContainer)
+            : null,
+      ),
+      title: Text(
+        call.otherName,
+        style: Theme.of(context)
+            .textTheme
+            .titleSmall
+            ?.copyWith(fontWeight: FontWeight.w600),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Row(
+        children: [
+          // Direction icon
+          Icon(
+            isOutgoing ? Icons.call_made : Icons.call_received,
+            size: 14,
+            color: isOutgoing ? Colors.green : Colors.blue,
+          ),
+          const SizedBox(width: 4),
+          // Duration
+          Text(
+            call.formattedDuration,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(width: 8),
+          // Coin info
+          Icon(Icons.monetization_on, size: 12, color: Colors.amber[700]),
+          const SizedBox(width: 2),
+          Text(
+            isOutgoing ? '-${call.coinsDeducted}' : '+${call.coinsEarned}',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: isOutgoing ? Colors.red[400] : Colors.green[600],
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+          const SizedBox(width: 8),
+          // Time ago
+          Expanded(
+            child: Text(
+              timeAgo,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+                    fontSize: 11,
+                  ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+      trailing: _ChatButton(otherFirebaseUid: call.otherFirebaseUid),
+    );
+  }
+
+  String _formatTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final diff = now.difference(date);
+
+    if (diff.inMinutes < 1) return 'just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+
+    return DateFormat('MMM d').format(date);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Chat button — creates/opens channel with the other party
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _ChatButton extends StatefulWidget {
+  final String otherFirebaseUid;
+  const _ChatButton({required this.otherFirebaseUid});
+
+  @override
+  State<_ChatButton> createState() => _ChatButtonState();
+}
+
+class _ChatButtonState extends State<_ChatButton> {
+  bool _loading = false;
+
+  Future<void> _openChat() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+
+    try {
+      final chatService = ChatService();
+      final result =
+          await chatService.createOrGetChannel(widget.otherFirebaseUid);
+      final channelId = result['channelId'] as String?;
+
+      if (channelId != null && mounted) {
+        context.push('/chat/$channelId');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open chat: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: _openChat,
+      icon: _loading
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(
+              Icons.chat_bubble_outline,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+      tooltip: 'Chat',
     );
   }
 }

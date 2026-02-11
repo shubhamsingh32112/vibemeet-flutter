@@ -1,0 +1,66 @@
+import 'package:equatable/equatable.dart';
+
+class CallHistoryModel extends Equatable {
+  final String id;
+  final String callId;
+  final String ownerUserId;
+  final String otherUserId;
+  final String otherName;
+  final String? otherAvatar;
+  final String otherFirebaseUid;
+  final String ownerRole; // 'user' or 'creator'
+  final int durationSeconds;
+  final int coinsDeducted;
+  final int coinsEarned;
+  final DateTime createdAt;
+
+  const CallHistoryModel({
+    required this.id,
+    required this.callId,
+    required this.ownerUserId,
+    required this.otherUserId,
+    required this.otherName,
+    this.otherAvatar,
+    required this.otherFirebaseUid,
+    required this.ownerRole,
+    required this.durationSeconds,
+    required this.coinsDeducted,
+    required this.coinsEarned,
+    required this.createdAt,
+  });
+
+  factory CallHistoryModel.fromJson(Map<String, dynamic> json) {
+    return CallHistoryModel(
+      id: json['_id'] as String? ?? '',
+      callId: json['callId'] as String? ?? '',
+      ownerUserId: json['ownerUserId'] as String? ?? '',
+      otherUserId: json['otherUserId'] as String? ?? '',
+      otherName: json['otherName'] as String? ?? 'Unknown',
+      otherAvatar: json['otherAvatar'] as String?,
+      otherFirebaseUid: json['otherFirebaseUid'] as String? ?? '',
+      ownerRole: json['ownerRole'] as String? ?? 'user',
+      durationSeconds: json['durationSeconds'] as int? ?? 0,
+      coinsDeducted: json['coinsDeducted'] as int? ?? 0,
+      coinsEarned: json['coinsEarned'] as int? ?? 0,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+    );
+  }
+
+  /// Format duration as "Xm Ys" or "Xs"
+  String get formattedDuration {
+    if (durationSeconds >= 60) {
+      final minutes = durationSeconds ~/ 60;
+      final seconds = durationSeconds % 60;
+      return seconds > 0 ? '${minutes}m ${seconds}s' : '${minutes}m';
+    }
+    return '${durationSeconds}s';
+  }
+
+  /// Whether the owner was the caller (user) or receiver (creator)
+  bool get isOutgoing => ownerRole == 'user';
+
+  @override
+  List<Object?> get props => [id, callId, ownerUserId, otherUserId, createdAt];
+}
