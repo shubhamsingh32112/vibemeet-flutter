@@ -66,6 +66,11 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/account-deletion" className="text-background/60 hover:text-background transition-colors">
+                  Delete Account
+                </Link>
+              </li>
+              <li>
                 <a href="#" className="text-background/60 hover:text-background transition-colors">
                   Cookies Policy
                 </a>
