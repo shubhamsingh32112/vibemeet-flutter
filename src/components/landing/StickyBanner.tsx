@@ -1,5 +1,6 @@
 import { Download, Shield, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APK_DOWNLOAD_URL } from "@/lib/constants";
 import { useState } from "react";
 
 const StickyBanner = () => {
@@ -18,7 +19,7 @@ const StickyBanner = () => {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="heroOutline" size="sm" className="hidden sm:flex" asChild>
-            <a href="/app-release.apk" download="Match-Vibe.apk">
+            <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
               <Download className="w-4 h-4" />
               Download APK
             </a>

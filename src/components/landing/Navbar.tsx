@@ -1,5 +1,6 @@
 import { Download, Video, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APK_DOWNLOAD_URL } from "@/lib/constants";
 import { useState } from "react";
 
 const Navbar = () => {
@@ -32,13 +33,13 @@ const Navbar = () => {
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
           <Button variant="outline" size="sm" asChild>
-            <a href="/app-release.apk" download="Match-Vibe.apk">
+            <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
               <Download className="w-4 h-4" />
               Download APK
             </a>
           </Button>
           <Button variant="hero" size="sm" asChild>
-            <a href="/app-release.apk" download="Match-Vibe.apk">
+            <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
               <Video className="w-4 h-4" />
               Start 1v1 Video Chat
             </a>
@@ -69,13 +70,13 @@ const Navbar = () => {
             </a>
             <div className="flex flex-col gap-3 pt-4 border-t border-border">
               <Button variant="outline" className="w-full" asChild>
-                <a href="/app-release.apk" download="Match-Vibe.apk">
+                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
                   <Download className="w-4 h-4" />
                   Download APK
                 </a>
               </Button>
               <Button variant="hero" className="w-full" asChild>
-                <a href="/app-release.apk" download="Match-Vibe.apk">
+                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
                   <Video className="w-4 h-4" />
                   Start 1v1 Video Chat
                 </a>

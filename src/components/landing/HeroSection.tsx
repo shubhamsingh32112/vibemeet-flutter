@@ -1,5 +1,6 @@
 import { Play, Download, Shield, Users, Zap, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APK_DOWNLOAD_URL } from "@/lib/constants";
 
 const HeroSection = () => {
   return (
@@ -32,13 +33,13 @@ const HeroSection = () => {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10">
               <Button variant="hero" size="xl" asChild>
-                <a href="/app-release.apk" download="Match-Vibe.apk">
+                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
                   <Play className="w-5 h-5" />
                   Start Video Call – FREE
                 </a>
               </Button>
               <Button variant="outline" size="xl" asChild>
-                <a href="/app-release.apk" download="Match-Vibe.apk">
+                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
                   <Download className="w-5 h-5" />
                   Download APK
                 </a>

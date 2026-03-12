@@ -1,5 +1,6 @@
 import { Download, Video, Heart, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APK_DOWNLOAD_URL } from "@/lib/constants";
 
 const CTASection = () => {
   return (
@@ -36,14 +37,16 @@ const CTASection = () => {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Button variant="heroOutline" size="xl" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" asChild>
-              <a href="/app-release.apk" download="Match-Vibe.apk">
+              <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
                 <Download className="w-5 h-5" />
                 Download APK Now
               </a>
             </Button>
-            <Button variant="heroOutline" size="xl">
-              <Video className="w-5 h-5" />
-              Join Match Vibe Today
+            <Button variant="heroOutline" size="xl" asChild>
+              <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+                <Video className="w-5 h-5" />
+                Join Match Vibe Today
+              </a>
             </Button>
           </div>
 

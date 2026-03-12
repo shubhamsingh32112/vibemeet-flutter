@@ -1,5 +1,6 @@
 import { Globe, MessageCircle, Heart, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { APK_DOWNLOAD_URL } from "@/lib/constants";
 
 const stats = [
   { icon: Users, value: "2M+", label: "Active Users" },
@@ -52,7 +53,7 @@ const GlobalSection = () => {
             </ul>
 
             <Button variant="hero" size="lg" asChild>
-              <a href="/app-release.apk" download="Match-Vibe.apk">
+              <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
                 <Globe className="w-5 h-5" />
                 Download App
               </a>
