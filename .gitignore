@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# APK - too large for GitHub; copy to public/ before deploy
+app-release.apk
+public/app-release.apk

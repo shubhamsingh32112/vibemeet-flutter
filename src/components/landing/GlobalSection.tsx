@@ -27,7 +27,7 @@ const GlobalSection = () => {
               Effortless 1v1 Video Chats <span>Across the World</span>
             </h2>
             <p className="text-muted-foreground text-lg mb-8">
-              Break down barriers and connect with people from every corner of the globe. Whether you're looking for romance, friendship, or cultural exchange – MatchVibe brings the world to your fingertips.
+              Break down barriers and connect with people from every corner of the globe. Whether you're looking for romance, friendship, or cultural exchange – Match Vibe brings the world to your fingertips.
             </p>
 
             <ul className="space-y-4 mb-8">
@@ -51,9 +51,11 @@ const GlobalSection = () => {
               </li>
             </ul>
 
-            <Button variant="hero" size="lg">
-              <Globe className="w-5 h-5" />
-              Join Global Community
+            <Button variant="hero" size="lg" asChild>
+              <a href="/app-release.apk" download="Match-Vibe.apk">
+                <Globe className="w-5 h-5" />
+                Download App
+              </a>
             </Button>
           </div>
 

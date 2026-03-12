@@ -27,8 +27,8 @@ const features = [
   },
   {
     icon: Users,
-    title: "Real People Only",
-    description: "Advanced verification ensures you're chatting with genuine users, not bots.",
+    title: "Real Creators",
+    description: "Connect with verified creators. No bots – real people ready to chat and connect.",
     color: "from-secondary to-primary",
   },
   {

@@ -27,7 +27,7 @@ const CTASection = () => {
           </div>
 
           <h2 className="text-3xl md:text-4xl lg:text-6xl font-extrabold text-primary-foreground mb-6">
-            Start 1v1 Video Chat with MatchVibe Now
+            Start 1v1 Video Chat with Match Vibe Now
           </h2>
 
           <p className="text-xl text-primary-foreground/80 mb-10 max-w-2xl mx-auto">
@@ -35,13 +35,15 @@ const CTASection = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <Button variant="heroOutline" size="xl" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
-              <Download className="w-5 h-5" />
-              Download APK Now
+            <Button variant="heroOutline" size="xl" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" asChild>
+              <a href="/app-release.apk" download="Match-Vibe.apk">
+                <Download className="w-5 h-5" />
+                Download APK Now
+              </a>
             </Button>
             <Button variant="heroOutline" size="xl">
               <Video className="w-5 h-5" />
-              Join MatchVibe Today
+              Join Match Vibe Today
             </Button>
           </div>
 

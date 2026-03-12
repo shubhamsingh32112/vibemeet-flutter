@@ -12,10 +12,10 @@ const Footer = () => {
               <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
                 <Video className="w-5 h-5 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold text-background">MatchVibe</span>
+              <span className="text-xl font-bold text-background">Match Vibe</span>
             </a>
             <p className="text-background/60 mb-6 max-w-sm">
-              The #1 video dating app connecting real people worldwide. Find love, friendship, and meaningful connections through 1v1 video chats.
+              The #1 video dating app connecting real people worldwide. Browse creators, start 1v1 video chats, and build meaningful connections.
             </p>
             <div className="flex items-center gap-2 text-background/50 text-sm">
               <span>Made with</span>
@@ -84,10 +84,10 @@ const Footer = () => {
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-background/50 text-sm text-center md:text-left">
               <p className="mb-1">MANTOTECH PRIVATE LIMITED</p>
-              <p>No 39, WolfPack Workspaces, 39, 8th Main Rd, Vasanth Nagar, Bengaluru, Karnataka 560001</p>
+              <p>No 39, WolfPack Workspaces, 8th Main Rd, Vasanth Nagar, Bengaluru, Karnataka 560001</p>
             </div>
             <p className="text-background/50 text-sm">
-              © 2025 MatchVibe Team. All Rights Reserved.
+              © 2025 Match Vibe. All Rights Reserved.
             </p>
           </div>
         </div>

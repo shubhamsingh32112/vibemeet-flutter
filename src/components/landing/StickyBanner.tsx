@@ -13,13 +13,15 @@ const StickyBanner = () => {
         <div className="flex items-center gap-3 flex-1 justify-center">
           <span className="text-lg">🔥</span>
           <p className="text-primary-foreground text-sm md:text-base font-medium">
-            Download MatchVibe App & Start Free 1v1 Video Chat Now!
+            Download Match Vibe App & Start Free 1v1 Video Chat Now!
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="heroOutline" size="sm" className="hidden sm:flex">
-            <Download className="w-4 h-4" />
-            Download APK
+          <Button variant="heroOutline" size="sm" className="hidden sm:flex" asChild>
+            <a href="/app-release.apk" download="Match-Vibe.apk">
+              <Download className="w-4 h-4" />
+              Download APK
+            </a>
           </Button>
           <div className="hidden md:flex items-center gap-1 text-primary-foreground/80 text-xs">
             <Shield className="w-3 h-3" />

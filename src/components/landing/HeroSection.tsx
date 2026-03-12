@@ -23,7 +23,7 @@ const HeroSection = () => {
             </div>
 
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
-              Start <span>1v1 Video Chat</span> with MatchVibe
+              Start <span>1v1 Video Chat</span> with Match Vibe
             </h1>
 
             <p className="text-lg md:text-xl text-muted-foreground mb-8 max-w-xl mx-auto lg:mx-0">
@@ -31,13 +31,17 @@ const HeroSection = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10">
-              <Button variant="hero" size="xl">
-                <Play className="w-5 h-5" />
-                Start Video Call – FREE
+              <Button variant="hero" size="xl" asChild>
+                <a href="/app-release.apk" download="Match-Vibe.apk">
+                  <Play className="w-5 h-5" />
+                  Start Video Call – FREE
+                </a>
               </Button>
-              <Button variant="outline" size="xl">
-                <Download className="w-5 h-5" />
-                Click to Get Free Calls
+              <Button variant="outline" size="xl" asChild>
+                <a href="/app-release.apk" download="Match-Vibe.apk">
+                  <Download className="w-5 h-5" />
+                  Download APK
+                </a>
               </Button>
             </div>
 
@@ -98,7 +102,7 @@ const HeroSection = () => {
                     </div>
                     <div>
                       <p className="font-semibold text-sm">Incoming call...</p>
-                      <p className="text-xs text-muted-foreground">Video Chat</p>
+                      <p className="text-xs text-muted-foreground">Match Vibe</p>
                     </div>
                   </div>
                 </div>

@@ -13,7 +13,7 @@ const Navbar = () => {
           <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center shadow-soft">
             <Video className="w-5 h-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-bold text-gradient">MatchVibe</span>
+          <span className="text-xl font-bold text-gradient">Match Vibe</span>
         </a>
 
         {/* Desktop Navigation */}
@@ -31,13 +31,17 @@ const Navbar = () => {
 
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4" />
-            Download
+          <Button variant="outline" size="sm" asChild>
+            <a href="/app-release.apk" download="Match-Vibe.apk">
+              <Download className="w-4 h-4" />
+              Download APK
+            </a>
           </Button>
-          <Button variant="hero" size="sm">
-            <Video className="w-4 h-4" />
-            Start 1v1 Video Chat
+          <Button variant="hero" size="sm" asChild>
+            <a href="/app-release.apk" download="Match-Vibe.apk">
+              <Video className="w-4 h-4" />
+              Start 1v1 Video Chat
+            </a>
           </Button>
         </div>
 
@@ -64,13 +68,17 @@ const Navbar = () => {
               FAQ
             </a>
             <div className="flex flex-col gap-3 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full">
-                <Download className="w-4 h-4" />
-                Download APK
+              <Button variant="outline" className="w-full" asChild>
+                <a href="/app-release.apk" download="Match-Vibe.apk">
+                  <Download className="w-4 h-4" />
+                  Download APK
+                </a>
               </Button>
-              <Button variant="hero" className="w-full">
-                <Video className="w-4 h-4" />
-                Start 1v1 Video Chat
+              <Button variant="hero" className="w-full" asChild>
+                <a href="/app-release.apk" download="Match-Vibe.apk">
+                  <Video className="w-4 h-4" />
+                  Start 1v1 Video Chat
+                </a>
               </Button>
             </div>
           </div>

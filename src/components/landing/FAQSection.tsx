@@ -7,16 +7,16 @@ import {
 
 const faqs = [
   {
-    question: "How does MatchVibe work?",
-    answer: "MatchVibe uses smart matching algorithms to connect you with compatible people worldwide. Simply create a profile, set your preferences, and start swiping. When you match with someone, you can text, voice call, or video chat instantly!",
+    question: "How does Match Vibe work?",
+    answer: "Match Vibe lets you browse creators and connect through 1v1 video calls. Sign in with Fast Login (no account needed), add coins for calls, and start chatting. You can also text chat before or after video calls.",
   },
   {
-    question: "Is MatchVibe free to use?",
-    answer: "Yes! MatchVibe is free to download and use. You can swipe, match, and chat with no limits. Premium features like unlimited swipes, seeing who liked you, and advanced filters are available with our optional subscription.",
+    question: "Is Match Vibe free to use?",
+    answer: "Match Vibe is free to download. Fast Login gets you in with one tap. Video calls use coins – new users get free coins to start. You can purchase more coins or earn them through the app.",
   },
   {
     question: "What devices are supported?",
-    answer: "MatchVibe is available for Android devices. Download our APK directly from our website for the best experience. iOS version coming soon!",
+    answer: "Match Vibe is available for Android. Download our APK from our website. iOS version coming soon!",
   },
   {
     question: "How do you ensure user privacy?",
@@ -24,7 +24,7 @@ const faqs = [
   },
   {
     question: "What is the age requirement?",
-    answer: "You must be 18 years or older to use MatchVibe. We have age verification measures in place to ensure all users are adults.",
+    answer: "You must be 18 years or older to use Match Vibe. We have age verification measures in place to ensure all users are adults.",
   },
   {
     question: "How do I report inappropriate behavior?",
@@ -46,7 +46,7 @@ const FAQSection = () => {
             Frequently Asked <span className="text-gradient">Questions</span>
           </h2>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Got questions? We've got answers. Find everything you need to know about MatchVibe.
+            Got questions? We've got answers. Find everything you need to know about Match Vibe.
           </p>
         </div>
 
