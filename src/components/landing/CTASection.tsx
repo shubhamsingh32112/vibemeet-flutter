@@ -1,6 +1,8 @@
 import { Download, Video, Heart, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { APK_DOWNLOAD_URL } from "@/lib/constants";
+import { PLAY_STORE_URL } from "@/lib/constants";
+import { GooglePlayIcon } from "@/components/icons/GooglePlayIcon";
+import { trackPlayStoreClick } from "@/lib/metaPixel";
 
 const CTASection = () => {
   return (
@@ -37,15 +39,25 @@ const CTASection = () => {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Button variant="heroOutline" size="xl" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" asChild>
-              <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-                <Download className="w-5 h-5" />
-                Download APK Now
+              <a
+                href={PLAY_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackPlayStoreClick("cta_primary")}
+              >
+                <GooglePlayIcon className="w-5 h-5" />
+                Download on Google Play
               </a>
             </Button>
             <Button variant="heroOutline" size="xl" asChild>
-              <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+              <a
+                href={PLAY_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackPlayStoreClick("cta_secondary")}
+              >
                 <Video className="w-5 h-5" />
-                Join Match Vibe Today
+                Start Now
               </a>
             </Button>
           </div>

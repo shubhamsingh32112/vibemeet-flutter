@@ -1,6 +1,7 @@
 import { Globe, MessageCircle, Heart, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { APK_DOWNLOAD_URL } from "@/lib/constants";
+import { PLAY_STORE_URL } from "@/lib/constants";
+import { trackPlayStoreClick } from "@/lib/metaPixel";
 
 const stats = [
   { icon: Users, value: "2M+", label: "Active Users" },
@@ -53,7 +54,12 @@ const GlobalSection = () => {
             </ul>
 
             <Button variant="hero" size="lg" asChild>
-              <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+              <a
+                href={PLAY_STORE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackPlayStoreClick("global_section")}
+              >
                 <Globe className="w-5 h-5" />
                 Download App
               </a>

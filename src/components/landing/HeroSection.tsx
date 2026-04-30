@@ -1,6 +1,8 @@
 import { Play, Download, Shield, Users, Zap, Heart } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { APK_DOWNLOAD_URL } from "@/lib/constants";
+import { PLAY_STORE_URL } from "@/lib/constants";
+import { GooglePlayIcon } from "@/components/icons/GooglePlayIcon";
+import { trackPlayStoreClick } from "@/lib/metaPixel";
 
 const HeroSection = () => {
   return (
@@ -32,16 +34,27 @@ const HeroSection = () => {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-10">
-              <Button variant="hero" size="xl" asChild>
-                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-                  <Play className="w-5 h-5" />
-                  Start Video Call – FREE
+              <Button variant="hero" size="xl" className="w-full sm:w-auto" asChild>
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Download Match Vibe from Google Play"
+                  onClick={() => trackPlayStoreClick("hero_primary")}
+                >
+                  <GooglePlayIcon className="w-5 h-5" />
+                  Download on Google Play
                 </a>
               </Button>
-              <Button variant="outline" size="xl" asChild>
-                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-                  <Download className="w-5 h-5" />
-                  Download APK
+              <Button variant="outline" size="xl" className="w-full sm:w-auto" asChild>
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackPlayStoreClick("hero_secondary")}
+                >
+                  <Play className="w-5 h-5" />
+                  Open in Play Store
                 </a>
               </Button>
             </div>

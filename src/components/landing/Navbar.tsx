@@ -1,7 +1,9 @@
 import { Download, Video, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { APK_DOWNLOAD_URL } from "@/lib/constants";
+import { PLAY_STORE_URL } from "@/lib/constants";
 import { useState } from "react";
+import { GooglePlayIcon } from "@/components/icons/GooglePlayIcon";
+import { trackPlayStoreClick } from "@/lib/metaPixel";
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -33,15 +35,25 @@ const Navbar = () => {
         {/* Desktop CTA */}
         <div className="hidden md:flex items-center gap-3">
           <Button variant="outline" size="sm" asChild>
-            <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-              <Download className="w-4 h-4" />
-              Download APK
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackPlayStoreClick("navbar_desktop_outline")}
+            >
+              <GooglePlayIcon className="w-4 h-4" />
+              Google Play
             </a>
           </Button>
           <Button variant="hero" size="sm" asChild>
-            <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackPlayStoreClick("navbar_desktop_primary")}
+            >
               <Video className="w-4 h-4" />
-              Start 1v1 Video Chat
+              Download App
             </a>
           </Button>
         </div>
@@ -70,15 +82,25 @@ const Navbar = () => {
             </a>
             <div className="flex flex-col gap-3 pt-4 border-t border-border">
               <Button variant="outline" className="w-full" asChild>
-                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-                  <Download className="w-4 h-4" />
-                  Download APK
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackPlayStoreClick("navbar_mobile_outline")}
+                >
+                  <GooglePlayIcon className="w-4 h-4" />
+                  Google Play
                 </a>
               </Button>
               <Button variant="hero" className="w-full" asChild>
-                <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={PLAY_STORE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => trackPlayStoreClick("navbar_mobile_primary")}
+                >
                   <Video className="w-4 h-4" />
-                  Start 1v1 Video Chat
+                  Download App
                 </a>
               </Button>
             </div>

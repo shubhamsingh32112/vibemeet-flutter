@@ -1,7 +1,9 @@
 import { Download, Shield, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { APK_DOWNLOAD_URL } from "@/lib/constants";
+import { PLAY_STORE_URL } from "@/lib/constants";
 import { useState } from "react";
+import { GooglePlayIcon } from "@/components/icons/GooglePlayIcon";
+import { trackPlayStoreClick } from "@/lib/metaPixel";
 
 const StickyBanner = () => {
   const [isVisible, setIsVisible] = useState(true);
@@ -19,9 +21,14 @@ const StickyBanner = () => {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="heroOutline" size="sm" className="hidden sm:flex" asChild>
-            <a href={APK_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer">
-              <Download className="w-4 h-4" />
-              Download APK
+            <a
+              href={PLAY_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => trackPlayStoreClick("sticky_banner")}
+            >
+              <GooglePlayIcon className="w-4 h-4" />
+              Google Play
             </a>
           </Button>
           <div className="hidden md:flex items-center gap-1 text-primary-foreground/80 text-xs">
